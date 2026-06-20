@@ -65,8 +65,13 @@ pipeline {
             // instead of dying later at rsync with "null@null:null".
             steps {
                 script {
-                    def missing = ['DEPLOY_HOST', 'DEPLOY_USER', 'DEPLOY_PORT', 'DEPLOY_PATH']
-                        .findAll { !env[it]?.trim() }
+                    // Explicit checks (no dynamic env[...] subscript — the Groovy
+                    // sandbox rejects DefaultGroovyMethods.getAt).
+                    def missing = []
+                    if (!env.DEPLOY_HOST?.trim()) { missing.add('DEPLOY_HOST') }
+                    if (!env.DEPLOY_USER?.trim()) { missing.add('DEPLOY_USER') }
+                    if (!env.DEPLOY_PORT?.trim()) { missing.add('DEPLOY_PORT') }
+                    if (!env.DEPLOY_PATH?.trim()) { missing.add('DEPLOY_PATH') }
                     if (missing) {
                         error("Missing Jenkins global env vars: ${missing.join(', ')}. " +
                               "Set them in Manage Jenkins → System → Global properties → Environment variables.")
