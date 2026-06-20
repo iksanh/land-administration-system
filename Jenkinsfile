@@ -2,8 +2,17 @@
 // it to Hostinger shared hosting over SSH (passwordless key — ssh-copy-id done).
 //
 // Job setup: create a "Pipeline" job → "Pipeline script from SCM" → this repo,
-// Script Path = Jenkinsfile. Fill the parameters on the first "Build with
-// Parameters" run; Jenkins remembers them for subsequent builds.
+// Script Path = Jenkinsfile.
+//
+// Server connection details are read from Jenkins GLOBAL environment variables
+// (not build parameters), so they live in Jenkins, not the repo. Set them once in:
+//   Manage Jenkins → System → Global properties → ☑ Environment variables → Add:
+//     DEPLOY_HOST  (e.g. 153.92.x.x)
+//     DEPLOY_USER  (e.g. u123456789)
+//     DEPLOY_PORT  (Hostinger = 65002)
+//     DEPLOY_PATH  (e.g. /home/uXXXX/laravel_app)
+// The remaining knobs (PHP_BIN, SSH_CRED_ID, migrate/maintenance toggles) stay as
+// build parameters below.
 //
 // Agent prerequisites (install once in WSL): php, composer, node + npm, rsync,
 // ssh/openssh-client. Jenkins plugins: Git, Pipeline, SSH Agent.
@@ -24,10 +33,8 @@ pipeline {
     agent any
 
     parameters {
-        string(name: 'DEPLOY_HOST', defaultValue: '', description: 'Hostinger SSH host (hPanel → SSH Access), e.g. 153.92.x.x or your domain')
-        string(name: 'DEPLOY_USER', defaultValue: '', description: 'Hostinger SSH username, e.g. u123456789')
-        string(name: 'DEPLOY_PORT', defaultValue: '65002', description: 'SSH port — Hostinger shared hosting uses 65002 (NOT 22)')
-        string(name: 'DEPLOY_PATH', defaultValue: '', description: 'Absolute app root on the server (the domain doc root should point to this + /public)')
+        // DEPLOY_HOST / DEPLOY_USER / DEPLOY_PORT / DEPLOY_PATH come from Jenkins
+        // global environment variables (Manage Jenkins → System → Global properties).
         string(name: 'PHP_BIN',     defaultValue: 'php', description: 'PHP CLI on the server — must be >= 8.3 (e.g. php, /opt/alt/php84/usr/bin/php)')
         string(name: 'SSH_CRED_ID', defaultValue: 'hostinger-ssh', description: 'Jenkins credentials ID — "SSH Username with private key" holding the key you ssh-copy-id\'d')
         booleanParam(name: 'RUN_MIGRATIONS',   defaultValue: true,  description: 'Run "php artisan migrate --force" after deploy')
@@ -43,7 +50,7 @@ pipeline {
     environment {
         // accept-new = trust the host key the first time, then pin it (no prompt, no blind MITM).
         // Port is included here so every ssh/rsync invocation talks to Hostinger's 65002.
-        SSH_OPTS = "-o StrictHostKeyChecking=accept-new -p ${params.DEPLOY_PORT}"
+        SSH_OPTS = "-o StrictHostKeyChecking=accept-new -p ${env.DEPLOY_PORT}"
     }
 
     stages {
@@ -108,7 +115,7 @@ pipeline {
                             --exclude='/public/hot' \
                             --exclude='Jenkinsfile' \
                             -e "ssh ${SSH_OPTS}" \
-                            ./ ${params.DEPLOY_USER}@${params.DEPLOY_HOST}:'${params.DEPLOY_PATH}/'
+                            ./ ${env.DEPLOY_USER}@${env.DEPLOY_HOST}:'${env.DEPLOY_PATH}/'
                     """
                 }
             }
@@ -124,7 +131,7 @@ pipeline {
                     // so fall back to route:clear — config + view caches still apply.
                     def remote = """
                         set -e
-                        cd '${params.DEPLOY_PATH}'
+                        cd '${env.DEPLOY_PATH}'
                         ${down}
                         ${migrate}
                         ${params.PHP_BIN} artisan storage:link || true
@@ -139,7 +146,7 @@ pipeline {
                     sshagent(credentials: [params.SSH_CRED_ID]) {
                         // Pipe the script over stdin to a login shell so the server's
                         // PATH (and the right PHP) is in scope — avoids quoting hell.
-                        sh "ssh ${SSH_OPTS} ${params.DEPLOY_USER}@${params.DEPLOY_HOST} 'bash -ls' < deploy_remote.sh"
+                        sh "ssh ${SSH_OPTS} ${env.DEPLOY_USER}@${env.DEPLOY_HOST} 'bash -ls' < deploy_remote.sh"
                     }
                 }
             }
@@ -148,16 +155,16 @@ pipeline {
 
     post {
         success {
-            echo "✅ Deployed to ${params.DEPLOY_USER}@${params.DEPLOY_HOST}:${params.DEPLOY_PATH} (port ${params.DEPLOY_PORT})"
+            echo "✅ Deployed to ${env.DEPLOY_USER}@${env.DEPLOY_HOST}:${env.DEPLOY_PATH} (port ${env.DEPLOY_PORT})"
         }
         failure {
             // Best-effort: bring the site back up if a failed release left it down.
             script {
-                if (params.DEPLOY_HOST?.trim()) {
+                if (env.DEPLOY_HOST?.trim()) {
                     sshagent(credentials: [params.SSH_CRED_ID]) {
                         sh """
-                            ssh ${SSH_OPTS} ${params.DEPLOY_USER}@${params.DEPLOY_HOST} \
-                                "cd '${params.DEPLOY_PATH}' && ${params.PHP_BIN} artisan up || true" || true
+                            ssh ${SSH_OPTS} ${env.DEPLOY_USER}@${env.DEPLOY_HOST} \
+                                "cd '${env.DEPLOY_PATH}' && ${params.PHP_BIN} artisan up || true" || true
                         """
                     }
                 }
