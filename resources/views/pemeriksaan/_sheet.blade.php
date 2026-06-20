@@ -26,15 +26,9 @@
         </tr>
 
         @php
-            // Notes take priority. With no notes, print the bare status code
-            // (OK / REVISI / TOLAK); a not-yet-reviewed PENDING berkas shows "-".
             $catatanText = function ($row) {
                 $texts = collect($row->catatan ?? [])->pluck('teks')->filter()->map(fn ($t) => e($t))->all();
-                if ($texts) {
-                    return implode('<br>', $texts);
-                }
-                $status = $row->status?->value ?? 'PENDING';
-                return $status === 'PENDING' ? '-' : e($status);
+                return $texts ? implode('<br>', $texts) : 'OK';
             };
         @endphp
 

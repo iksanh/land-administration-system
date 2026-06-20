@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\MapLayananBerkas;
 use App\Models\PemeriksaanBerkas;
 use App\Models\Permohonan;
 
@@ -11,47 +10,31 @@ use App\Models\Permohonan;
  * (shared by PemeriksaanPrintController and the in-app print modal).
  * Returns [parents, childrenMap] — parents ordered by the layanan's
  * MapLayananBerkas.urutan (nulls last); childrenMap keyed by parent berkas id.
- *
- * The sheet is sourced from the layanan's MapLayananBerkas checklist — the same
- * authoritative list the pemeriksaan page shows — so every mapped berkas appears,
- * including ones added to the mapping after inspection started. The matching
- * PemeriksaanBerkas record (status/catatan) is attached where one exists; berkas
- * not yet inspected render with no catatan ("OK"). Sourcing from the inspection
- * records instead would silently drop newly-mapped berkas and any child whose
- * parent hadn't been inspected.
  */
 class PemeriksaanSheet
 {
     public static function build(Permohonan $permohonan): array
     {
-        $mappings = MapLayananBerkas::query()
+        $rows = PemeriksaanBerkas::query()
             ->with('berkasItem')
-            ->where('layanan_id', $permohonan->layanan_id)
+            ->where('pemeriksaan_berkas.permohonan_id', $permohonan->id)
+            ->leftJoin('map_layanan_berkas', function ($join) use ($permohonan) {
+                $join->on('map_layanan_berkas.berkas_item_id', '=', 'pemeriksaan_berkas.berkas_item_id')
+                    ->where('map_layanan_berkas.layanan_id', '=', $permohonan->layanan_id);
+            })
             // MySQL has no "NULLS LAST"; emulate it (NULLs sort first by default on ASC).
-            ->orderByRaw('urutan is null, urutan asc')
-            ->get()
-            ->filter(fn ($m) => $m->berkasItem !== null);
-
-        $pemeriksaan = PemeriksaanBerkas::where('permohonan_id', $permohonan->id)
-            ->get()
-            ->keyBy('berkas_item_id');
-
-        // Mapped berkas ids — a child only nests under its parent when that parent
-        // is itself mapped; otherwise it's shown top-level (mirrors the page list).
-        $mappedIds = array_flip($mappings->pluck('berkasItem.id')->all());
+            ->orderByRaw('map_layanan_berkas.urutan is null, map_layanan_berkas.urutan asc')
+            ->select('pemeriksaan_berkas.*')
+            ->get();
 
         $parents = [];
         $childrenMap = [];
-        foreach ($mappings as $mapping) {
-            $berkasItem = $mapping->berkasItem;
-
-            $row = $pemeriksaan->get($berkasItem->id)
-                ?? tap(new PemeriksaanBerkas, fn ($r) => $r->berkas_item_id = $berkasItem->id);
-            $row->setRelation('berkasItem', $berkasItem);
-
-            $parentId = $berkasItem->parent_id;
-            if ($parentId && isset($mappedIds[$parentId])) {
-                $childrenMap[$parentId][] = $row;
+        foreach ($rows as $row) {
+            if (! $row->berkasItem) {
+                continue;
+            }
+            if ($row->berkasItem->parent_id) {
+                $childrenMap[$row->berkasItem->parent_id][] = $row;
             } else {
                 $parents[] = $row;
             }
