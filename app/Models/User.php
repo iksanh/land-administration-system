@@ -30,6 +30,8 @@ class User extends Authenticatable
 
     protected $hidden = [
         'hashed_password',
+        'mfa_secret',
+        'mfa_recovery_codes',
     ];
 
     protected function casts(): array
@@ -37,6 +39,11 @@ class User extends Authenticatable
         return [
             'is_active' => 'boolean',
             'created_at' => 'datetime',
+            'mfa_enabled' => 'boolean',
+            'mfa_confirmed_at' => 'datetime',
+            // Encrypted at rest (uses APP_KEY). Never store TOTP secrets in plain text.
+            'mfa_secret' => 'encrypted',
+            'mfa_recovery_codes' => 'encrypted:array',
         ];
     }
 
@@ -47,5 +54,11 @@ class User extends Authenticatable
     public function getAuthPassword(): string
     {
         return $this->hashed_password;
+    }
+
+    /** True once the user has fully set up and confirmed an authenticator. */
+    public function hasMfaEnabled(): bool
+    {
+        return $this->mfa_enabled && $this->mfa_confirmed_at !== null;
     }
 }

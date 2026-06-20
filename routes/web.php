@@ -2,13 +2,14 @@
 
 use App\Http\Controllers\PemeriksaanPrintController;
 use App\Livewire\AuditLog\AuditLogTimeline;
-use App\Livewire\Dashboard;
 use App\Livewire\Auth\Login;
+use App\Livewire\Auth\ManageMfa;
 use App\Livewire\Berkas\ManageBerkasItem;
 use App\Livewire\Berkas\ManageMapLayananBerkas;
 use App\Livewire\Catatan\ManageMstCatatan;
-use App\Livewire\Pemeriksaan\ManagePemeriksaanBerkas;
+use App\Livewire\Dashboard;
 use App\Livewire\Layanan\ManageLayanan;
+use App\Livewire\Pemeriksaan\ManagePemeriksaanBerkas;
 use App\Livewire\Pemohon\ManagePemohon;
 use App\Livewire\Permohonan\ManagePermohonan;
 use App\Livewire\Tanah\ManageTanah;
@@ -37,6 +38,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/pemeriksaan-berkas', ManagePemeriksaanBerkas::class)->name('pemeriksaan-berkas');
     Route::get('/permohonan/{permohonan}/cetak-pemeriksaan', PemeriksaanPrintController::class)->name('pemeriksaan.print');
     Route::get('/audit-log', AuditLogTimeline::class)->name('audit-log');
+
+    // Account security — per-user, opt-in TOTP MFA
+    Route::get('/keamanan', ManageMfa::class)->name('mfa');
 
     // Admin-only (ports get_current_admin)
     Route::middleware('role:admin')->group(function () {

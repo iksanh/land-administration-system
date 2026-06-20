@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title ?? 'Dashboard' }} — SIP Bone Bolango</title>
     <style>[x-cloak]{display:none!important}</style>
-    @vite(['resources/css/app.css'])
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="antialiased bg-[#f0f2f5] min-h-screen" x-data="{ sidebarOpen: false }">
     <div class="flex min-h-screen">
@@ -93,6 +93,12 @@
                             {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
                         </div>
                     </div>
+                    <a href="{{ route('mfa') }}" wire:navigate title="Keamanan akun"
+                        class="text-sm px-3 sm:px-4 py-1.5 rounded border transition-all duration-200 inline-flex items-center gap-1.5
+                            {{ request()->routeIs('mfa') ? 'text-[#1677ff] border-[#1677ff] bg-[#e6f4ff]' : 'text-gray-600 border-gray-300 hover:bg-gray-50' }}">
+                        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 5.591-3.824 10.29-9 11.622C6.824 22.29 3 17.591 3 12V6.633c0-.55.32-1.052.82-1.282A11.96 11.96 0 0 1 12 3.25c2.95 0 5.66 1.067 7.18 2.101.5.23.82.732.82 1.282V12Z"/></svg>
+                        <span class="hidden sm:inline">Keamanan</span>
+                    </a>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="text-sm px-3 sm:px-4 py-1.5 rounded text-red-500 border border-red-500 hover:bg-red-50 hover:text-red-600 hover:border-red-600 transition-all duration-200">
