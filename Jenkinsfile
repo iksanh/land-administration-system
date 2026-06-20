@@ -60,6 +60,22 @@ pipeline {
             }
         }
 
+        stage('Verify config') {
+            // Fail fast (with a clear message) if the global env vars aren't set,
+            // instead of dying later at rsync with "null@null:null".
+            steps {
+                script {
+                    def missing = ['DEPLOY_HOST', 'DEPLOY_USER', 'DEPLOY_PORT', 'DEPLOY_PATH']
+                        .findAll { !env[it]?.trim() }
+                    if (missing) {
+                        error("Missing Jenkins global env vars: ${missing.join(', ')}. " +
+                              "Set them in Manage Jenkins → System → Global properties → Environment variables.")
+                    }
+                    echo "Deploy target: ${env.DEPLOY_USER}@${env.DEPLOY_HOST}:${env.DEPLOY_PATH} (port ${env.DEPLOY_PORT})"
+                }
+            }
+        }
+
         stage('Verify tooling') {
             steps {
                 sh '''
