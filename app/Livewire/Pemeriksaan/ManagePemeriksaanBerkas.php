@@ -73,6 +73,20 @@ class ManagePemeriksaanBerkas extends Component
             'customCatatan' => ['nullable', 'string'],
         ]);
 
+        // PENDING is the "unexamined" default — don't persist it. If a record
+        // already exists, delete it so the berkas reverts to PENDING; otherwise
+        // do nothing.
+        if ($this->formStatus === PemeriksaanStatusEnum::PENDING->value) {
+            PemeriksaanBerkas::where('permohonan_id', $this->selectedPermohonan)
+                ->where('berkas_item_id', $this->editingBerkasId)
+                ->delete();
+
+            $this->cancelPeriksa();
+            session()->flash('message', 'Pemeriksaan berkas dikembalikan ke PENDING.');
+
+            return;
+        }
+
         $catatan = [];
         foreach (MstCatatan::whereIn('id', $this->selectedCatatanIds)->get() as $mc) {
             $catatan[] = ['id' => $mc->id, 'teks' => $mc->teks, 'is_custom' => false];

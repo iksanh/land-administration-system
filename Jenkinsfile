@@ -1,5 +1,5 @@
 // CI/CD pipeline: build the Laravel app on the Jenkins (WSL) agent, then deploy
-// it to shared hosting over SSH (passwordless key — ssh-copy-id already done).
+// it to Hostinger shared hosting over SSH (passwordless key — ssh-copy-id done).
 //
 // Job setup: create a "Pipeline" job → "Pipeline script from SCM" → this repo,
 // Script Path = Jenkinsfile. Fill the parameters on the first "Build with
@@ -8,19 +8,28 @@
 // Agent prerequisites (install once in WSL): php, composer, node + npm, rsync,
 // ssh/openssh-client. Jenkins plugins: Git, Pipeline, SSH Agent.
 //
-// IMPORTANT: vendor/ is resolved against symfony/laravel deps that require
-// PHP >= 8.4.1, so the SHARED HOST must run PHP >= 8.4.1 too. Set PHP_BIN to the
-// matching binary (e.g. /usr/local/bin/ea-php84 on cPanel).
+// ── Hostinger specifics ───────────────────────────────────────────────────────
+//  • SSH PORT IS 65002, not 22 — set via DEPLOY_PORT (used by both ssh & rsync).
+//  • Find your SSH host/user/port in hPanel → Advanced → SSH Access.
+//  • PHP_BIN: Hostinger CLI php often lives at /opt/alt/php84/usr/bin/php (or just
+//    `php` if the account's default PHP is 8.3+). Match composer.json (php ^8.3).
+//  • Document root: this file deploys the WHOLE app to DEPLOY_PATH and assumes you
+//    pointed the domain's document root to "<DEPLOY_PATH>/public" in
+//    hPanel → Websites → Manage → Website settings. The real .env, storage/, and
+//    public/storage symlink already on the server are NEVER overwritten (excluded
+//    from rsync below). If your doc root is locked to public_html, deploy with a
+//    layout that puts public/ contents into public_html — ask before changing.
 
 pipeline {
     agent any
 
     parameters {
-        string(name: 'DEPLOY_HOST', defaultValue: '', description: 'Shared-hosting hostname or IP (e.g. server123.webhost.com)')
-        string(name: 'DEPLOY_USER', defaultValue: '', description: 'SSH / cPanel username')
-        string(name: 'DEPLOY_PATH', defaultValue: '/home/USER/laravel_app', description: 'Absolute path to the Laravel app root on the server (kept ABOVE public_html)')
-        string(name: 'PHP_BIN',     defaultValue: 'php', description: 'PHP CLI on the server — must be >= 8.4.1 (e.g. php, php8.4, /usr/local/bin/ea-php84)')
-        string(name: 'SSH_CRED_ID', defaultValue: 'shared-hosting-ssh', description: 'Jenkins credentials ID — "SSH Username with private key" holding the key you ssh-copy-id\'d')
+        string(name: 'DEPLOY_HOST', defaultValue: '', description: 'Hostinger SSH host (hPanel → SSH Access), e.g. 153.92.x.x or your domain')
+        string(name: 'DEPLOY_USER', defaultValue: '', description: 'Hostinger SSH username, e.g. u123456789')
+        string(name: 'DEPLOY_PORT', defaultValue: '65002', description: 'SSH port — Hostinger shared hosting uses 65002 (NOT 22)')
+        string(name: 'DEPLOY_PATH', defaultValue: '/home/uXXXXXXXXX/domains/yourdomain.com/laravel_app', description: 'Absolute app root on the server (the domain doc root should point to this + /public)')
+        string(name: 'PHP_BIN',     defaultValue: 'php', description: 'PHP CLI on the server — must be >= 8.3 (e.g. php, /opt/alt/php84/usr/bin/php)')
+        string(name: 'SSH_CRED_ID', defaultValue: 'hostinger-ssh', description: 'Jenkins credentials ID — "SSH Username with private key" holding the key you ssh-copy-id\'d')
         booleanParam(name: 'RUN_MIGRATIONS',   defaultValue: true,  description: 'Run "php artisan migrate --force" after deploy')
         booleanParam(name: 'MAINTENANCE_MODE', defaultValue: true,  description: 'Put the site in maintenance mode during the release step')
     }
@@ -33,7 +42,8 @@ pipeline {
 
     environment {
         // accept-new = trust the host key the first time, then pin it (no prompt, no blind MITM).
-        SSH_OPTS = '-o StrictHostKeyChecking=accept-new'
+        // Port is included here so every ssh/rsync invocation talks to Hostinger's 65002.
+        SSH_OPTS = "-o StrictHostKeyChecking=accept-new -p ${params.DEPLOY_PORT}"
     }
 
     stages {
@@ -58,8 +68,9 @@ pipeline {
 
         stage('Build: Composer (no-dev)') {
             steps {
-                // --ignore-platform-req=php: the agent runs PHP 8.4.0 but deps want
-                // 8.4.1; the produced vendor/ is valid on the 8.4.1+ server.
+                // --ignore-platform-req=php guards against a minor PHP gap between the
+                // WSL agent and the Hostinger server; the produced vendor/ is valid as
+                // long as the server runs PHP >= 8.3 (see PHP_BIN).
                 sh '''
                     set -e
                     composer install --no-dev --optimize-autoloader --no-interaction \
@@ -97,7 +108,7 @@ pipeline {
                             --exclude='/public/hot' \
                             --exclude='Jenkinsfile' \
                             -e "ssh ${SSH_OPTS}" \
-                            ./ ${params.DEPLOY_USER}@${params.DEPLOY_HOST}:${params.DEPLOY_PATH}/
+                            ./ ${params.DEPLOY_USER}@${params.DEPLOY_HOST}:'${params.DEPLOY_PATH}/'
                     """
                 }
             }
@@ -137,7 +148,7 @@ pipeline {
 
     post {
         success {
-            echo "✅ Deployed to ${params.DEPLOY_USER}@${params.DEPLOY_HOST}:${params.DEPLOY_PATH}"
+            echo "✅ Deployed to ${params.DEPLOY_USER}@${params.DEPLOY_HOST}:${params.DEPLOY_PATH} (port ${params.DEPLOY_PORT})"
         }
         failure {
             // Best-effort: bring the site back up if a failed release left it down.
