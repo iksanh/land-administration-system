@@ -26,7 +26,7 @@ pipeline {
     parameters {
         string(name: 'DEPLOY_HOST', defaultValue: '', description: 'Hostinger SSH host (hPanel → SSH Access), e.g. 153.92.x.x or your domain')
         string(name: 'DEPLOY_USER', defaultValue: '', description: 'Hostinger SSH username, e.g. u123456789')
-        string(name: 'DEPLOY_PORT', defaultValue: '', description: 'SSH port — Hostinger shared hosting uses 65002 (NOT 22)')
+        string(name: 'DEPLOY_PORT', defaultValue: '65002', description: 'SSH port — Hostinger shared hosting uses 65002 (NOT 22)')
         string(name: 'DEPLOY_PATH', defaultValue: '', description: 'Absolute app root on the server (the domain doc root should point to this + /public)')
         string(name: 'PHP_BIN',     defaultValue: 'php', description: 'PHP CLI on the server — must be >= 8.3 (e.g. php, /opt/alt/php84/usr/bin/php)')
         string(name: 'SSH_CRED_ID', defaultValue: 'hostinger-ssh', description: 'Jenkins credentials ID — "SSH Username with private key" holding the key you ssh-copy-id\'d')
