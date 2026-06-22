@@ -129,12 +129,10 @@
                         </td>
                         <td class="px-4 py-3">
                             <div class="flex items-center justify-center gap-2 flex-wrap">
-                                <button wire:click="startStatusChange('{{ $p->id }}')" class="text-[#722ed1] hover:text-[#531dab] font-medium text-xs">Ubah Status</button>
-                                <span class="w-px h-3 bg-gray-300"></span>
-                                <button wire:click="edit('{{ $p->id }}')" class="text-[#1677ff] hover:text-[#0958d9] font-medium text-xs">Edit</button>
+                                <x-action-btn icon="status" variant="purple" wire:click="startStatusChange('{{ $p->id }}')">Ubah Status</x-action-btn>
+                                <x-action-btn icon="edit" variant="primary" wire:click="edit('{{ $p->id }}')">Edit</x-action-btn>
                                 @if ($p->status->value === 'DRAFT')
-                                    <span class="w-px h-3 bg-gray-300"></span>
-                                    <button wire:click="delete('{{ $p->id }}')" wire:confirm="Hapus permohonan {{ $p->nomor_registrasi }}?" class="text-[#ff4d4f] hover:text-[#cf1322] font-medium text-xs">Hapus</button>
+                                    <x-action-btn icon="delete" variant="danger" wire:click="delete('{{ $p->id }}')" wire:confirm="Hapus permohonan {{ $p->nomor_registrasi }}?">Hapus</x-action-btn>
                                 @endif
                             </div>
 

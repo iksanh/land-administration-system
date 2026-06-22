@@ -59,7 +59,7 @@
                                 </td>
                                 <td class="px-4 py-2 text-gray-800">{{ $m->berkasItem->nama ?? '—' }}</td>
                                 <td class="px-4 py-2 text-center">
-                                    <button wire:click="toggle('{{ $m->berkas_item_id }}')" class="text-xs font-medium text-[#ff4d4f] hover:text-[#cf1322]">Hapus</button>
+                                    <x-action-btn icon="delete" variant="danger" wire:click="toggle('{{ $m->berkas_item_id }}')">Hapus</x-action-btn>
                                 </td>
                             </tr>
                         @empty

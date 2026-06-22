@@ -100,10 +100,9 @@
                         <td class="px-4 py-3 text-center">{{ $p->jenis_kelamin?->value ?? '—' }}</td>
                         <td class="px-4 py-3">{{ $p->desa?->nama ?? '—' }}</td>
                         <td class="px-4 py-3">
-                            <div class="flex items-center justify-center gap-3">
-                                <button wire:click="edit('{{ $p->id }}')" class="text-[#1677ff] hover:text-[#0958d9] font-medium text-xs">Edit</button>
-                                <span class="w-px h-3 bg-gray-300"></span>
-                                <button wire:click="delete('{{ $p->id }}')" wire:confirm="Hapus pemohon {{ $p->nama }}?" class="text-[#ff4d4f] hover:text-[#cf1322] font-medium text-xs">Hapus</button>
+                            <div class="flex items-center justify-center gap-2">
+                                <x-action-btn icon="edit" variant="primary" wire:click="edit('{{ $p->id }}')">Edit</x-action-btn>
+                                <x-action-btn icon="delete" variant="danger" wire:click="delete('{{ $p->id }}')" wire:confirm="Hapus pemohon {{ $p->nama }}?">Hapus</x-action-btn>
                             </div>
                         </td>
                     </tr>

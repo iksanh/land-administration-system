@@ -120,12 +120,10 @@
                             </button>
                         </td>
                         <td class="px-4 py-3">
-                            <div class="flex items-center justify-center gap-3">
-                                <button wire:click="startEdit('{{ $user->id }}')" class="text-[#1677ff] hover:text-[#0958d9] font-medium text-xs">Edit</button>
-                                <span class="w-px h-3 bg-gray-300"></span>
-                                <button wire:click="startResetPassword('{{ $user->id }}')" class="text-[#faad14] hover:text-[#d48806] font-medium text-xs">Reset Password</button>
-                                <span class="w-px h-3 bg-gray-300"></span>
-                                <button wire:click="delete('{{ $user->id }}')" wire:confirm="Hapus user {{ $user->name }}?" class="text-[#ff4d4f] hover:text-[#cf1322] font-medium text-xs">Hapus</button>
+                            <div class="flex items-center justify-center gap-2 flex-wrap">
+                                <x-action-btn icon="edit" variant="primary" wire:click="startEdit('{{ $user->id }}')">Edit</x-action-btn>
+                                <x-action-btn icon="key" variant="warning" wire:click="startResetPassword('{{ $user->id }}')">Reset Password</x-action-btn>
+                                <x-action-btn icon="delete" variant="danger" wire:click="delete('{{ $user->id }}')" wire:confirm="Hapus user {{ $user->name }}?">Hapus</x-action-btn>
                             </div>
                         </td>
                     </tr>
