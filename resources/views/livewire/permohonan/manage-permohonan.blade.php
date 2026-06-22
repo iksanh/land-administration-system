@@ -100,6 +100,7 @@
             <thead class="bg-[#fafafa] border-b border-gray-200 text-gray-800 font-medium">
                 <tr>
                     <th class="px-4 py-3">No. Registrasi</th>
+                    <th class="px-4 py-3">Tgl. Pendaftaran</th>
                     <th class="px-4 py-3">Pemohon</th>
                     <th class="px-4 py-3">Layanan</th>
                     <th class="px-4 py-3">Tanah</th>
@@ -111,6 +112,7 @@
                 @forelse ($permohonanList as $p)
                     <tr class="hover:bg-gray-50 align-top">
                         <td class="px-4 py-3 font-mono text-xs text-gray-700">{{ $p->nomor_registrasi }}</td>
+                        <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{ $p->tgl_pendaftaran?->locale('id')->translatedFormat('d F Y') ?? '—' }}</td>
                         <td class="px-4 py-3 font-semibold text-gray-800">{{ $p->pemohon?->nama ?? '—' }}</td>
                         <td class="px-4 py-3">{{ $p->layanan?->nama ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-500">
@@ -156,7 +158,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="px-4 py-10 text-center text-gray-400">{{ $search !== '' ? 'Tidak ada permohonan yang cocok dengan pencarian.' : 'Belum ada permohonan.' }}</td></tr>
+                    <tr><td colspan="7" class="px-4 py-10 text-center text-gray-400">{{ $search !== '' ? 'Tidak ada permohonan yang cocok dengan pencarian.' : 'Belum ada permohonan.' }}</td></tr>
                 @endforelse
             </tbody>
         </table>
