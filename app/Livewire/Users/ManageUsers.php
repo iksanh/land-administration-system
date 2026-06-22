@@ -29,6 +29,11 @@ class ManageUsers extends Component
     public string $editRole = 'petugas';
     public bool $editActive = true;
 
+    // Inline reset password
+    public ?string $resettingId = null;
+    public string $resetPassword = '';
+    public string $resetPasswordConfirmation = '';
+
     public function create(): void
     {
         $data = $this->validate([
@@ -52,6 +57,7 @@ class ManageUsers extends Component
 
     public function startEdit(string $id): void
     {
+        $this->cancelResetPassword();
         $user = User::findOrFail($id);
         $this->editingId = $user->id;
         $this->editName = $user->name;
@@ -82,10 +88,64 @@ class ManageUsers extends Component
         session()->flash('message', 'User berhasil diperbarui.');
     }
 
+    public function startResetPassword(string $id): void
+    {
+        $this->cancelEdit();
+        $user = User::findOrFail($id);
+        $this->resettingId = $user->id;
+        $this->reset(['resetPassword', 'resetPasswordConfirmation']);
+    }
+
+    public function cancelResetPassword(): void
+    {
+        $this->reset(['resettingId', 'resetPassword', 'resetPasswordConfirmation']);
+    }
+
+    public function saveResetPassword(): void
+    {
+        $data = $this->validate([
+            'resetPassword' => ['required', 'string', 'min:6'],
+            'resetPasswordConfirmation' => ['required', 'same:resetPassword'],
+        ], [
+            'resetPasswordConfirmation.same' => 'Konfirmasi password tidak cocok.',
+        ], [
+            'resetPassword' => 'password',
+            'resetPasswordConfirmation' => 'konfirmasi password',
+        ]);
+
+        User::findOrFail($this->resettingId)->update([
+            'hashed_password' => Hash::make($data['resetPassword']),
+        ]);
+
+        $this->cancelResetPassword();
+        session()->flash('message', 'Password user berhasil direset.');
+    }
+
     public function toggleActive(string $id): void
     {
         $user = User::findOrFail($id);
         $user->update(['is_active' => ! $user->is_active]);
+    }
+
+    /**
+     * Admin override: clears a user's MFA enrollment without requiring their code,
+     * e.g. when they lose access to their authenticator device.
+     */
+    public function disableMfa(string $id): void
+    {
+        $user = User::findOrFail($id);
+
+        if (! $user->hasMfaEnabled()) {
+            return;
+        }
+
+        $user->mfa_secret = null;
+        $user->mfa_enabled = false;
+        $user->mfa_confirmed_at = null;
+        $user->mfa_recovery_codes = null;
+        $user->save();
+
+        session()->flash('message', 'MFA user berhasil dinonaktifkan.');
     }
 
     public function delete(string $id): void

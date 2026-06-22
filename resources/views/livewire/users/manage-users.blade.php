@@ -81,6 +81,7 @@
                     <th class="px-4 py-3">Nama</th>
                     <th class="px-4 py-3">Email</th>
                     <th class="px-4 py-3 text-center">Role</th>
+                    <th class="px-4 py-3 text-center">MFA</th>
                     <th class="px-4 py-3 text-center">Aktif</th>
                     <th class="px-4 py-3 text-center">Aksi</th>
                 </tr>
@@ -98,6 +99,21 @@
                             </span>
                         </td>
                         <td class="px-4 py-3 text-center">
+                            @if ($user->hasMfaEnabled())
+                                <div class="flex flex-col items-center gap-1">
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#f6ffed] text-[#52c41a] border border-[#b7eb8f]">
+                                        ● Aktif
+                                    </span>
+                                    <button wire:click="disableMfa('{{ $user->id }}')" wire:confirm="Nonaktifkan MFA untuk {{ $user->name }}?"
+                                        class="text-[10px] text-[#ff4d4f] hover:text-[#cf1322] font-medium">Nonaktifkan</button>
+                                </div>
+                            @else
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-100 text-gray-500 border border-gray-200">
+                                    ○ Nonaktif
+                                </span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 text-center">
                             <button wire:click="toggleActive('{{ $user->id }}')"
                                 class="relative inline-flex h-5 w-10 items-center rounded-full transition-colors {{ $user->is_active ? 'bg-[#52c41a]' : 'bg-gray-300' }}">
                                 <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition {{ $user->is_active ? 'translate-x-5' : 'translate-x-1' }}"></span>
@@ -107,6 +123,8 @@
                             <div class="flex items-center justify-center gap-3">
                                 <button wire:click="startEdit('{{ $user->id }}')" class="text-[#1677ff] hover:text-[#0958d9] font-medium text-xs">Edit</button>
                                 <span class="w-px h-3 bg-gray-300"></span>
+                                <button wire:click="startResetPassword('{{ $user->id }}')" class="text-[#faad14] hover:text-[#d48806] font-medium text-xs">Reset Password</button>
+                                <span class="w-px h-3 bg-gray-300"></span>
                                 <button wire:click="delete('{{ $user->id }}')" wire:confirm="Hapus user {{ $user->name }}?" class="text-[#ff4d4f] hover:text-[#cf1322] font-medium text-xs">Hapus</button>
                             </div>
                         </td>
@@ -114,7 +132,7 @@
 
                     @if ($editingId === $user->id)
                         <tr class="bg-[#fffbe6] border-y border-[#ffe58f]">
-                            <td colspan="6" class="px-6 py-5">
+                            <td colspan="7" class="px-6 py-5">
                                 <form wire:submit="update" class="flex flex-col gap-4">
                                     <p class="text-sm font-semibold text-[#d48806] border-b border-[#ffe58f] pb-2">Edit: {{ $user->name }}</p>
                                     <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -146,8 +164,36 @@
                             </td>
                         </tr>
                     @endif
+
+                    @if ($resettingId === $user->id)
+                        <tr class="bg-[#fff7e6] border-y border-[#ffd591]">
+                            <td colspan="7" class="px-6 py-5">
+                                <form wire:submit="saveResetPassword" class="flex flex-col gap-4">
+                                    <p class="text-sm font-semibold text-[#d46b08] border-b border-[#ffd591] pb-2">Reset Password: {{ $user->name }}</p>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-2xl">
+                                        <div class="flex flex-col gap-1.5">
+                                            <label class="text-xs font-semibold text-gray-500 uppercase">Password Baru</label>
+                                            <input type="password" wire:model="resetPassword" placeholder="Minimal 6 karakter"
+                                                class="border border-[#ffd591] rounded-md px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#fa8c16]">
+                                            @error('resetPassword') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+                                        </div>
+                                        <div class="flex flex-col gap-1.5">
+                                            <label class="text-xs font-semibold text-gray-500 uppercase">Konfirmasi Password</label>
+                                            <input type="password" wire:model="resetPasswordConfirmation" placeholder="Ulangi password baru"
+                                                class="border border-[#ffd591] rounded-md px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#fa8c16]">
+                                            @error('resetPasswordConfirmation') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-end gap-3">
+                                        <button type="button" wire:click="cancelResetPassword" class="px-5 py-1.5 rounded-md text-sm text-gray-600 bg-white border border-gray-300 hover:bg-gray-50">Batal</button>
+                                        <button type="submit" class="bg-[#fa8c16] hover:bg-[#d46b08] text-white px-6 py-1.5 rounded-md font-medium text-sm shadow-sm">Simpan Password Baru</button>
+                                    </div>
+                                </form>
+                            </td>
+                        </tr>
+                    @endif
                 @empty
-                    <tr><td colspan="6" class="px-4 py-10 text-center text-gray-400">{{ $search !== '' ? 'Tidak ada pengguna yang cocok dengan pencarian.' : 'Tidak ada data pengguna.' }}</td></tr>
+                    <tr><td colspan="7" class="px-4 py-10 text-center text-gray-400">{{ $search !== '' ? 'Tidak ada pengguna yang cocok dengan pencarian.' : 'Tidak ada data pengguna.' }}</td></tr>
                 @endforelse
             </tbody>
         </table>

@@ -4,6 +4,7 @@ namespace App\Livewire\Auth;
 
 use App\Support\Totp;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -30,6 +31,13 @@ class ManageMfa extends Component
 
     // Disable form
     public string $disableCode = '';
+
+    // Self-service password change
+    public string $currentPassword = '';
+
+    public string $newPassword = '';
+
+    public string $newPasswordConfirmation = '';
 
     public function startSetup(): void
     {
@@ -136,6 +144,35 @@ class ManageMfa extends Component
 
         $this->reset(['disableCode', 'recoveryCodes']);
         session()->flash('message', 'Autentikasi dua faktor dinonaktifkan.');
+    }
+
+    public function changePassword(): void
+    {
+        $this->validate([
+            'currentPassword' => ['required', 'string'],
+            'newPassword' => ['required', 'string', 'min:6'],
+            'newPasswordConfirmation' => ['required', 'same:newPassword'],
+        ], [
+            'newPasswordConfirmation.same' => 'Konfirmasi password tidak cocok.',
+        ], [
+            'currentPassword' => 'password saat ini',
+            'newPassword' => 'password baru',
+            'newPasswordConfirmation' => 'konfirmasi password',
+        ]);
+
+        $user = Auth::user();
+
+        if (! Hash::check($this->currentPassword, $user->getAuthPassword())) {
+            throw ValidationException::withMessages([
+                'currentPassword' => 'Password saat ini salah.',
+            ]);
+        }
+
+        $user->hashed_password = Hash::make($this->newPassword);
+        $user->save();
+
+        $this->reset(['currentPassword', 'newPassword', 'newPasswordConfirmation']);
+        session()->flash('message', 'Password berhasil diperbarui.');
     }
 
     /** Eight normalized (uppercase, no separators) one-time recovery codes. */

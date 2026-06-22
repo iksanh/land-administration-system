@@ -111,4 +111,34 @@
             </button>
         </div>
     @endif
+
+    {{-- Change own password --}}
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-5">
+        <h3 class="font-semibold text-gray-800 mb-1">Ubah Password</h3>
+        <p class="text-sm text-gray-500 mb-4">Perbarui password akun Anda. Minimal 6 karakter.</p>
+        <form wire:submit="changePassword" class="flex flex-col gap-4 max-w-sm">
+            <div class="flex flex-col gap-1.5">
+                <label class="text-sm font-medium text-gray-700">Password Saat Ini</label>
+                <input type="password" wire:model="currentPassword" autocomplete="current-password"
+                    class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#1677ff] focus:ring-2 focus:ring-[#1677ff]/20" />
+                @error('currentPassword') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+            </div>
+            <div class="flex flex-col gap-1.5">
+                <label class="text-sm font-medium text-gray-700">Password Baru</label>
+                <input type="password" wire:model="newPassword" autocomplete="new-password" placeholder="Minimal 6 karakter"
+                    class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#1677ff] focus:ring-2 focus:ring-[#1677ff]/20" />
+                @error('newPassword') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+            </div>
+            <div class="flex flex-col gap-1.5">
+                <label class="text-sm font-medium text-gray-700">Konfirmasi Password Baru</label>
+                <input type="password" wire:model="newPasswordConfirmation" autocomplete="new-password" placeholder="Ulangi password baru"
+                    class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#1677ff] focus:ring-2 focus:ring-[#1677ff]/20" />
+                @error('newPasswordConfirmation') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+            </div>
+            <button type="submit"
+                class="self-start bg-[#1677ff] hover:bg-[#0958d9] text-white rounded-md px-4 py-2 text-sm font-medium">
+                Simpan Password Baru
+            </button>
+        </form>
+    </div>
 </div>
