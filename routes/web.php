@@ -1,16 +1,20 @@
 <?php
 
+use App\Http\Controllers\BeritaAcaraPrintController;
+use App\Http\Controllers\BeritaAcaraWordController;
 use App\Http\Controllers\PemeriksaanPrintController;
 use App\Livewire\AuditLog\AuditLogTimeline;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\ManageMfa;
 use App\Livewire\Berkas\ManageBerkasItem;
+use App\Livewire\BeritaAcara\ManageBeritaAcara;
 use App\Livewire\Berkas\ManageMapLayananBerkas;
 use App\Livewire\Catatan\ManageMstCatatan;
 use App\Livewire\Dashboard;
 use App\Livewire\Layanan\ManageLayanan;
 use App\Livewire\Pemeriksaan\ManagePemeriksaanBerkas;
 use App\Livewire\Pemohon\ManagePemohon;
+use App\Livewire\Panitia\ManagePanitia;
 use App\Livewire\Permohonan\ManagePermohonan;
 use App\Livewire\Tanah\ManageTanah;
 use App\Livewire\Users\ManageUsers;
@@ -38,6 +42,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/pemeriksaan-berkas', ManagePemeriksaanBerkas::class)->name('pemeriksaan-berkas');
     Route::get('/permohonan/{permohonan}/cetak-pemeriksaan', PemeriksaanPrintController::class)->name('pemeriksaan.print');
     Route::get('/audit-log', AuditLogTimeline::class)->name('audit-log');
+
+    // Berita Acara Pemeriksaan Lapang (Panitia A)
+    Route::get('/panitia', ManagePanitia::class)->name('panitia');
+    Route::get('/berita-acara', ManageBeritaAcara::class)->name('berita-acara');
+    Route::get('/berita-acara/{beritaAcara}/cetak', BeritaAcaraPrintController::class)->name('berita-acara.print');
+    Route::get('/berita-acara/{beritaAcara}/word', BeritaAcaraWordController::class)->name('berita-acara.word');
 
     // Account security — per-user, opt-in TOTP MFA
     Route::get('/keamanan', ManageMfa::class)->name('mfa');

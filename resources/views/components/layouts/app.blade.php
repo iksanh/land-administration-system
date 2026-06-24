@@ -45,7 +45,7 @@
                 </a>
 
                 <p class="{{ $heading }}">Alur Permohonan</p>
-                @foreach ([['Data Pemohon', 'pemohon'], ['Data Tanah', 'tanah'], ['Permohonan', 'permohonan'], ['Pemeriksaan Berkas', 'pemeriksaan-berkas']] as $i => [$label, $r])
+                @foreach ([['Data Pemohon', 'pemohon'], ['Data Tanah', 'tanah'], ['Permohonan', 'permohonan'], ['Pemeriksaan Berkas', 'pemeriksaan-berkas'], ['Berita Acara Lapang', 'berita-acara']] as $i => [$label, $r])
                     <a href="{{ route($r) }}" wire:navigate class="{{ $cls($r) }}">
                         <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 {{ $isActive($r) ? 'bg-white text-[#1677ff]' : 'bg-white/10 text-gray-300' }}">{{ $i + 1 }}</span>
                         {{ $label }}
@@ -57,7 +57,7 @@
                 </a>
 
                 <p class="{{ $heading }}">Master Data</p>
-                @foreach ([['Master Layanan', 'layanan'], ['Master Berkas', 'berkas-item'], ['Pemetaan Berkas', 'map-layanan-berkas'], ['Master Catatan', 'master-catatan'], ['Master Wilayah', 'wilayah']] as [$label, $r])
+                @foreach ([['Master Layanan', 'layanan'], ['Master Berkas', 'berkas-item'], ['Pemetaan Berkas', 'map-layanan-berkas'], ['Master Catatan', 'master-catatan'], ['Master Wilayah', 'wilayah'], ['Panitia Pemeriksa', 'panitia']] as [$label, $r])
                     <a href="{{ route($r) }}" wire:navigate class="{{ $cls($r) }}">
                         <span class="w-1.5 h-1.5 rounded-full bg-current opacity-50 shrink-0 mx-1.5"></span>
                         {{ $label }}

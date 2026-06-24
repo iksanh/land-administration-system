@@ -131,6 +131,10 @@
                             <div class="flex items-center justify-center gap-2 flex-wrap">
                                 <x-action-btn icon="status" variant="purple" wire:click="startStatusChange('{{ $p->id }}')">Ubah Status</x-action-btn>
                                 <x-action-btn icon="edit" variant="primary" wire:click="edit('{{ $p->id }}')">Edit</x-action-btn>
+                                <a href="{{ route('berita-acara', ['permohonan' => $p->id]) }}" wire:navigate
+                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border bg-white transition-colors text-[#08979c] border-[#87e8de] hover:bg-[#e6fffb] hover:border-[#08979c]">
+                                    Berita Acara
+                                </a>
                                 @if ($p->status->value === 'DRAFT')
                                     <x-action-btn icon="delete" variant="danger" wire:click="delete('{{ $p->id }}')" wire:confirm="Hapus permohonan {{ $p->nomor_registrasi }}?">Hapus</x-action-btn>
                                 @endif

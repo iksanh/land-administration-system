@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
             WilayahSeeder::class,
             LayananSeeder::class,
             BerkasItemSeeder::class,
+            PanitiaPemeriksaSeeder::class,
         ]);
     }
 }
