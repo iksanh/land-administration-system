@@ -28,8 +28,11 @@ class ManagePemeriksaanBerkas extends Component
 
     // Inline check panel
     public ?string $editingBerkasId = null;
+
     public string $formStatus = 'PENDING';
+
     public array $selectedCatatanIds = [];
+
     public string $customCatatan = '';
 
     // Print preview modal
@@ -134,7 +137,7 @@ class ManagePemeriksaanBerkas extends Component
         $printParents = [];
         $printChildrenMap = [];
         if ($this->showPrint && $permohonan) {
-            $permohonan->loadMissing(['pemohon', 'layanan', 'tanah']);
+            $permohonan->loadMissing(['pemohon', 'layanan', 'tanah.desa.kecamatan']);
             [$printParents, $printChildrenMap] = PemeriksaanSheet::build($permohonan);
         }
 

@@ -15,7 +15,7 @@ class PemeriksaanPrintController extends Controller
 {
     public function __invoke(Permohonan $permohonan): View
     {
-        $permohonan->load(['pemohon', 'layanan', 'tanah']);
+        $permohonan->load(['pemohon', 'layanan', 'tanah.desa.kecamatan']);
 
         [$parents, $childrenMap] = PemeriksaanSheet::build($permohonan);
 

@@ -14,10 +14,25 @@
 
     <div class="title">{{ $permohonan->layanan?->nama ?? '-' }}</div>
 
+    @php
+        $pemohon = $permohonan->pemohon;
+        $namaPemohon = $pemohon?->nama ?? '-';
+        // "Nama Kuasa a.n Nama Pemohon" bila permohonan dikuasakan, selain itu nama pemohon saja.
+        $namaDisplay = ($pemohon && $pemohon->jenis_pemohon === \App\Enums\JenisPemohonEnum::DIKUASAKAN && $pemohon->kuasa_nama)
+            ? $pemohon->kuasa_nama.' a.n '.$namaPemohon
+            : $namaPemohon;
+
+        $tanah = $permohonan->tanah;
+        $nib = ($tanah && $tanah->nib) ? $tanah->nib : '-';
+        // Lokasi tanah didaftarkan: desa, kecamatan.
+        $lokasi = array_filter([$tanah?->desa?->nama, $tanah?->desa?->kecamatan?->nama]);
+        $nibDisplay = $lokasi ? $nib.' / '.implode(', ', $lokasi) : $nib;
+    @endphp
+
     <table>
         <tr class="header-yellow">
-            <td colspan="2">Nama : {{ $permohonan->pemohon?->nama ?? '-' }}</td>
-            <td>NIB : {{ $permohonan->tanah?->nib ?? '-' }}</td>
+            <td colspan="2">Nama : {{ $namaDisplay }}</td>
+            <td>NIB : {{ $nibDisplay }}</td>
         </tr>
         <tr class="header-yellow">
             <th width="5%">No</th>
