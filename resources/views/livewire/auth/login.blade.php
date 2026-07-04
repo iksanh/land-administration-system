@@ -12,6 +12,16 @@
             <p class="text-sm text-gray-500 mt-2">Silakan masukkan kredensial Anda untuk masuk ke sistem.</p>
         </div>
 
+        {{-- Success flash (e.g. after a password reset) --}}
+        @if (session('status'))
+            <div class="bg-[#f6ffed] border border-[#b7eb8f] text-[#389e0d] px-4 py-3 rounded-md mb-6 flex items-start gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="text-sm">{{ session('status') }}</span>
+            </div>
+        @endif
+
         {{-- Error alert --}}
         @foreach (['email', 'otp'] as $errField)
             @error($errField)
@@ -39,7 +49,12 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block text-sm font-medium text-gray-700">Password</label>
+                        <a href="{{ route('password.request') }}" wire:navigate class="text-xs text-[#1677ff] hover:text-[#0958d9] font-medium">
+                            Lupa password?
+                        </a>
+                    </div>
                     <input
                         type="password"
                         wire:model="password"

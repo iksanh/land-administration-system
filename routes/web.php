@@ -4,8 +4,10 @@ use App\Http\Controllers\BeritaAcaraPrintController;
 use App\Http\Controllers\BeritaAcaraWordController;
 use App\Http\Controllers\PemeriksaanPrintController;
 use App\Livewire\AuditLog\AuditLogTimeline;
+use App\Livewire\Auth\ForgotPassword;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\ManageMfa;
+use App\Livewire\Auth\ResetPassword;
 use App\Livewire\Berkas\ManageBerkasItem;
 use App\Livewire\BeritaAcara\ManageBeritaAcara;
 use App\Livewire\Berkas\ManageMapLayananBerkas;
@@ -26,6 +28,10 @@ Route::get('/', fn () => redirect()->route('dashboard'));
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', Login::class)->name('login');
+
+    // Forgot / reset password (email-based, self-service)
+    Route::get('/lupa-password', ForgotPassword::class)->name('password.request');
+    Route::get('/reset-password', ResetPassword::class)->name('password.reset');
 });
 
 Route::middleware('auth')->group(function () {
