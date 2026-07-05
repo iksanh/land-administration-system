@@ -2,6 +2,7 @@
 
 namespace App\Livewire\BeritaAcara;
 
+use App\Livewire\Concerns\WithRiwayatPenguasaan;
 use App\Models\BeritaAcaraPemeriksaan;
 use App\Models\PanitiaPemeriksa;
 use App\Models\Permohonan;
@@ -20,6 +21,7 @@ use Livewire\WithFileUploads;
 class ManageBeritaAcara extends Component
 {
     use WithFileUploads;
+    use WithRiwayatPenguasaan;
 
     public const DEFAULT_KEBERATAN = 'Bahwa pada saat kami melakukan Pemeriksaan Lapang tidak ada yang mengajukan keberatan atau merasa keberatan terhadap Permohonan Hak dimaksud.';
 
@@ -36,9 +38,6 @@ class ManageBeritaAcara extends Component
     public string $nomor_ba = '';
 
     public string $tgl_pemeriksaan = '';
-
-    /** @var array<int, string> daftar poin riwayat penguasaan */
-    public array $riwayat_penguasaan = [];
 
     public string $keadaan_tanah = '';
 
@@ -75,7 +74,7 @@ class ManageBeritaAcara extends Component
         $this->catatan_keberatan = self::DEFAULT_KEBERATAN;
         $this->perda_rtrw = self::DEFAULT_PERDA;
         $this->tgl_pemeriksaan = now()->format('Y-m-d');
-        $this->riwayat_penguasaan = ['']; // satu poin kosong agar form siap diisi
+        $this->loadRiwayat($permohonanId);
         // Pra-pilih seluruh anggota panitia aktif sesuai urutan.
         $this->selectedPanitia = PanitiaPemeriksa::where('is_active', true)
             ->orderBy('urutan')->orderBy('nama')->pluck('id')->all();
@@ -90,7 +89,7 @@ class ManageBeritaAcara extends Component
         $this->permohonan_id = $ba->permohonan_id;
         $this->nomor_ba = $ba->nomor_ba ?? '';
         $this->tgl_pemeriksaan = $ba->tgl_pemeriksaan?->format('Y-m-d') ?? '';
-        $this->riwayat_penguasaan = ! empty($ba->riwayat_penguasaan) ? $ba->riwayat_penguasaan : [''];
+        $this->loadRiwayat($ba->permohonan_id);
         $this->keadaan_tanah = $ba->keadaan_tanah ?? '';
         $this->catatan_keberatan = $ba->catatan_keberatan ?? '';
         $this->perda_rtrw = $ba->perda_rtrw ?? '';
@@ -99,39 +98,12 @@ class ManageBeritaAcara extends Component
         $this->showForm = true;
     }
 
-    /** Tambah satu poin riwayat penguasaan kosong di akhir. */
-    public function addRiwayat(): void
-    {
-        $this->riwayat_penguasaan[] = '';
-    }
-
-    public function removeRiwayat(int $index): void
-    {
-        unset($this->riwayat_penguasaan[$index]);
-        $this->riwayat_penguasaan = array_values($this->riwayat_penguasaan);
-    }
-
-    /** Geser poin ke atas (-1) atau ke bawah (+1). */
-    public function moveRiwayat(int $index, int $direction): void
-    {
-        $target = $index + $direction;
-
-        if (! isset($this->riwayat_penguasaan[$index], $this->riwayat_penguasaan[$target])) {
-            return;
-        }
-
-        [$this->riwayat_penguasaan[$index], $this->riwayat_penguasaan[$target]]
-            = [$this->riwayat_penguasaan[$target], $this->riwayat_penguasaan[$index]];
-    }
-
     protected function rules(): array
     {
         return [
             'permohonan_id' => ['required', 'exists:permohonan,id'],
             'nomor_ba' => ['nullable', 'string', 'max:100'],
             'tgl_pemeriksaan' => ['nullable', 'date'],
-            'riwayat_penguasaan' => ['array'],
-            'riwayat_penguasaan.*' => ['nullable', 'string'],
             'keadaan_tanah' => ['nullable', 'string'],
             'catatan_keberatan' => ['nullable', 'string'],
             'perda_rtrw' => ['nullable', 'string', 'max:255'],
@@ -139,31 +111,28 @@ class ManageBeritaAcara extends Component
             'selectedPanitia.*' => ['exists:panitia_pemeriksa,id'],
             'newPhotos' => ['array'],
             'newPhotos.*' => ['image', 'max:5120'], // maks 5 MB / foto
-        ];
+        ] + $this->riwayatRules();
     }
 
     public function save(): void
     {
         $data = $this->validate();
 
-        // Buang poin kosong & rapikan urutan sebelum disimpan.
-        $riwayat = array_values(array_filter(
-            array_map('trim', $data['riwayat_penguasaan']),
-            fn ($v) => $v !== '',
-        ));
-
-        $ba = DB::transaction(function () use ($data, $riwayat) {
+        $ba = DB::transaction(function () use ($data) {
             $ba = BeritaAcaraPemeriksaan::updateOrCreate(
                 ['permohonan_id' => $data['permohonan_id']],
                 [
                     'nomor_ba' => $data['nomor_ba'] ?: null,
                     'tgl_pemeriksaan' => $data['tgl_pemeriksaan'] ?: null,
-                    'riwayat_penguasaan' => $riwayat ?: null,
                     'keadaan_tanah' => $data['keadaan_tanah'] ?: null,
                     'catatan_keberatan' => $data['catatan_keberatan'] ?: null,
                     'perda_rtrw' => $data['perda_rtrw'] ?: null,
                 ],
             );
+
+            // Riwayat penguasaan disimpan sebagai record tersendiri (dipakai ulang
+            // oleh Risalah & SK) — lihat trait WithRiwayatPenguasaan.
+            $this->saveRiwayat($data['permohonan_id']);
 
             // Sinkron panitia + simpan urutan tampil.
             $sync = [];
@@ -221,9 +190,10 @@ class ManageBeritaAcara extends Component
     {
         $this->reset([
             'editingId', 'permohonan_id', 'nomor_ba', 'tgl_pemeriksaan',
-            'riwayat_penguasaan', 'keadaan_tanah', 'catatan_keberatan',
+            'keadaan_tanah', 'catatan_keberatan',
             'perda_rtrw', 'selectedPanitia', 'newPhotos', 'showForm',
         ]);
+        $this->resetRiwayat();
     }
 
     public function render()

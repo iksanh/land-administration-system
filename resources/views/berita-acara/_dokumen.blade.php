@@ -19,7 +19,7 @@
     $tglPeriksa = $ba->tgl_pemeriksaan;
     $luasInt = $t && $t->luas !== null ? (int) $t->luas : null;
     $luasFmt = $t && $t->luas !== null ? rtrim(rtrim(number_format($t->luas, 2, ',', '.'), '0'), ',') : null;
-    $poinRiwayat = array_values(array_filter($ba->riwayat_penguasaan ?? []));
+    $poinRiwayat = array_values(array_filter($ba->permohonan?->riwayatPenguasaan?->poin ?? []));
 
     $imgSrc = function (string $path) use ($mode): string {
         if ($mode === 'word') {

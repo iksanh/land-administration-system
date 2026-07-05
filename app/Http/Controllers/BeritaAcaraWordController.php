@@ -18,6 +18,7 @@ class BeritaAcaraWordController extends Controller
         $beritaAcara->load([
             'permohonan.pemohon',
             'permohonan.tanah.desa.kecamatan.kabupaten.provinsi',
+            'permohonan.riwayatPenguasaan',
             'panitia',
             'lampiran',
         ]);

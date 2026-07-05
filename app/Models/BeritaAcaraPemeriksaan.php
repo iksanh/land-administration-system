@@ -21,7 +21,6 @@ class BeritaAcaraPemeriksaan extends Model
         'permohonan_id',
         'nomor_ba',
         'tgl_pemeriksaan',
-        'riwayat_penguasaan',
         'keadaan_tanah',
         'catatan_keberatan',
         'perda_rtrw',
@@ -31,7 +30,6 @@ class BeritaAcaraPemeriksaan extends Model
     {
         return [
             'tgl_pemeriksaan' => 'date',
-            'riwayat_penguasaan' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

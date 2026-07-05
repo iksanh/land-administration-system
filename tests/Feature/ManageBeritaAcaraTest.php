@@ -7,6 +7,7 @@ use App\Models\BeritaAcaraPemeriksaan;
 use App\Models\PanitiaPemeriksa;
 use App\Models\Pemohon;
 use App\Models\Permohonan;
+use App\Models\RiwayatPenguasaan;
 use App\Models\Tanah;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -49,10 +50,10 @@ class ManageBeritaAcaraTest extends TestCase
 
         $ba = BeritaAcaraPemeriksaan::where('permohonan_id', $p->id)->first();
         $this->assertNotNull($ba);
-        // Poin kosong dibuang, urutan dipertahankan.
+        // Poin kosong dibuang, urutan dipertahankan — kini di record riwayat tersendiri.
         $this->assertSame(
             ['Dikuasai Rasid Nusi sejak 1996.', 'Dijual ke Abdul Wahab 2003.'],
-            $ba->riwayat_penguasaan,
+            $p->riwayatPenguasaan->poin,
         );
         $this->assertCount(2, $ba->panitia);
     }
@@ -72,6 +73,27 @@ class ManageBeritaAcaraTest extends TestCase
 
         $this->assertSame(1, BeritaAcaraPemeriksaan::where('permohonan_id', $p->id)->count());
         $this->assertSame('BA-1-REV', BeritaAcaraPemeriksaan::first()->nomor_ba);
+    }
+
+    public function test_riwayat_penguasaan_stored_once_per_permohonan(): void
+    {
+        $p = $this->permohonan();
+
+        Livewire::test(ManageBeritaAcara::class)
+            ->call('createFor', $p->id)
+            ->set('riwayat_penguasaan', ['Poin awal.'])
+            ->call('save')
+            ->call('createFor', $p->id) // buka ulang -> edit
+            ->set('riwayat_penguasaan', ['Poin diperbarui.', 'Poin kedua.'])
+            ->call('save')
+            ->assertHasNoErrors();
+
+        // Satu record riwayat per permohonan (updateOrCreate, tidak menggandakan).
+        $this->assertSame(1, RiwayatPenguasaan::where('permohonan_id', $p->id)->count());
+        $this->assertSame(
+            ['Poin diperbarui.', 'Poin kedua.'],
+            $p->riwayatPenguasaan->poin,
+        );
     }
 
     public function test_can_upload_and_remove_photo(): void
@@ -136,7 +158,10 @@ class ManageBeritaAcaraTest extends TestCase
         $ba = BeritaAcaraPemeriksaan::create([
             'permohonan_id' => $p->id,
             'tgl_pemeriksaan' => '2025-01-13',
-            'riwayat_penguasaan' => ['Dikuasai sejak 1996.'],
+        ]);
+        RiwayatPenguasaan::create([
+            'permohonan_id' => $p->id,
+            'poin' => ['Dikuasai sejak 1996.'],
         ]);
 
         $res = $this->actingAs($user)->get(route('berita-acara.word', $ba->id));

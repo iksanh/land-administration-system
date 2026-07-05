@@ -70,33 +70,10 @@
                         class="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]">
                 </div>
             </div>
-            <div class="flex flex-col gap-2">
-                <div class="flex items-center justify-between">
-                    <label class="text-sm font-medium text-gray-700">Riwayat Penguasaan (1.a)</label>
-                    <button type="button" wire:click="addRiwayat"
-                        class="text-xs font-medium text-[#1677ff] hover:text-[#0958d9] inline-flex items-center gap-1">
-                        + Tambah Poin
-                    </button>
-                </div>
-                <p class="text-xs text-gray-400 -mt-1">Tiap poin akan dicetak sebagai butir terpisah pada bagian 1.a.</p>
-                @forelse ($riwayat_penguasaan as $i => $poin)
-                    <div class="flex items-start gap-2" wire:key="riwayat-{{ $i }}">
-                        <span class="mt-2 text-xs font-semibold text-gray-400 w-5 text-right shrink-0">{{ $i + 1 }}.</span>
-                        <textarea wire:model="riwayat_penguasaan.{{ $i }}" rows="3" placeholder="Misal: Bahwa bidang tanah dikuasai oleh ... sejak tahun ..."
-                            class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]"></textarea>
-                        <div class="flex flex-col gap-1 shrink-0">
-                            <button type="button" wire:click="moveRiwayat({{ $i }}, -1)" @disabled($i === 0)
-                                class="w-7 h-7 rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-xs" title="Naik">↑</button>
-                            <button type="button" wire:click="moveRiwayat({{ $i }}, 1)" @disabled($i === count($riwayat_penguasaan) - 1)
-                                class="w-7 h-7 rounded border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-xs" title="Turun">↓</button>
-                            <button type="button" wire:click="removeRiwayat({{ $i }})"
-                                class="w-7 h-7 rounded border border-[#ffa39e] text-[#ff4d4f] hover:bg-[#fff1f0] text-xs" title="Hapus poin">✕</button>
-                        </div>
-                    </div>
-                @empty
-                    <p class="text-xs text-gray-400">Belum ada poin. Klik "+ Tambah Poin".</p>
-                @endforelse
-            </div>
+            @include('livewire.riwayat-tanah._editor', [
+                'label' => 'Riwayat Penguasaan (1.a)',
+                'hint' => 'Tiap poin akan dicetak sebagai butir terpisah pada bagian 1.a.',
+            ])
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="flex flex-col gap-1.5">
                     <label class="text-sm font-medium text-gray-700">Keadaan Tanah / Existing (1.c)</label>

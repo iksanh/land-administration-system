@@ -54,4 +54,9 @@ class Permohonan extends Model
     {
         return $this->belongsTo(MstLayanan::class, 'layanan_id');
     }
+
+    public function riwayatPenguasaan()
+    {
+        return $this->hasOne(RiwayatPenguasaan::class, 'permohonan_id');
+    }
 }
