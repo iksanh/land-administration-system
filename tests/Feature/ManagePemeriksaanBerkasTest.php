@@ -37,17 +37,62 @@ class ManagePemeriksaanBerkasTest extends TestCase
             ->assertViewHas('berkasList', fn ($list) => $list->count() === 1 && $list->first()->id === $berkas->id);
     }
 
-    public function test_save_creates_pemeriksaan_with_status_and_custom_catatan(): void
+    public function test_search_filters_berkas_by_name(): void
+    {
+        $layanan = MstLayanan::create(['kode' => 'LYN-1', 'nama' => 'Layanan 1']);
+        $ktp = MstBerkasItem::create(['nama' => 'Fotokopi KTP']);
+        $kk = MstBerkasItem::create(['nama' => 'Kartu Keluarga']);
+        MapLayananBerkas::create(['layanan_id' => $layanan->id, 'berkas_item_id' => $ktp->id, 'urutan' => 1]);
+        MapLayananBerkas::create(['layanan_id' => $layanan->id, 'berkas_item_id' => $kk->id, 'urutan' => 2]);
+        $permohonan = Permohonan::create(['nomor_registrasi' => 'REG-1', 'layanan_id' => $layanan->id]);
+
+        Livewire::test(ManagePemeriksaanBerkas::class)
+            ->set('selectedPermohonan', $permohonan->id)
+            ->assertViewHas('berkasList', fn ($list) => $list->count() === 2)
+            ->set('search', 'ktp') // case-insensitive
+            ->assertViewHas('berkasList', fn ($list) => $list->count() === 1 && $list->first()->id === $ktp->id)
+            ->assertViewHas('hasBerkas', true);
+    }
+
+    public function test_changing_permohonan_clears_search(): void
+    {
+        [$permohonan, $berkas] = $this->scenario();
+
+        Livewire::test(ManagePemeriksaanBerkas::class)
+            ->set('search', 'apapun')
+            ->set('selectedPermohonan', $permohonan->id)
+            ->assertSet('search', '');
+    }
+
+    public function test_one_click_ok_creates_record_without_opening_editor(): void
     {
         [$permohonan, $berkas] = $this->scenario();
 
         Livewire::test(ManagePemeriksaanBerkas::class)
             ->set('selectedPermohonan', $permohonan->id)
-            ->call('startPeriksa', $berkas->id)
-            ->set('formStatus', 'REVISI')
+            ->call('setStatus', $berkas->id, 'OK')
+            ->assertHasNoErrors()
+            // OK tak perlu catatan — editor tetap tertutup.
+            ->assertSet('editingBerkasId', null);
+
+        $row = PemeriksaanBerkas::where('permohonan_id', $permohonan->id)->where('berkas_item_id', $berkas->id)->first();
+        $this->assertSame(PemeriksaanStatusEnum::OK, $row->status);
+        $this->assertNull($row->catatan);
+    }
+
+    public function test_revisi_opens_catatan_editor_and_saves_custom_note(): void
+    {
+        [$permohonan, $berkas] = $this->scenario();
+
+        Livewire::test(ManagePemeriksaanBerkas::class)
+            ->set('selectedPermohonan', $permohonan->id)
+            // Satu klik REVISI menyimpan status dan langsung membuka editor catatan.
+            ->call('setStatus', $berkas->id, 'REVISI')
+            ->assertSet('editingBerkasId', $berkas->id)
             ->set('customCatatan', 'KTP tidak terbaca')
-            ->call('savePeriksa')
-            ->assertHasNoErrors();
+            ->call('saveCatatan')
+            ->assertHasNoErrors()
+            ->assertSet('editingBerkasId', null);
 
         $row = PemeriksaanBerkas::where('permohonan_id', $permohonan->id)->where('berkas_item_id', $berkas->id)->first();
         $this->assertSame(PemeriksaanStatusEnum::REVISI, $row->status);
@@ -63,14 +108,28 @@ class ManagePemeriksaanBerkasTest extends TestCase
 
         Livewire::test(ManagePemeriksaanBerkas::class)
             ->set('selectedPermohonan', $permohonan->id)
-            ->call('startPeriksa', $berkas->id)
-            ->set('formStatus', 'OK')
+            ->call('setStatus', $berkas->id, 'OK')
+            ->call('openCatatan', $berkas->id)
             ->set('selectedCatatanIds', [$mc->id])
-            ->call('savePeriksa');
+            ->call('saveCatatan');
 
         $row = PemeriksaanBerkas::where('berkas_item_id', $berkas->id)->first();
         $this->assertSame($mc->id, $row->catatan[0]['id']);
         $this->assertFalse($row->catatan[0]['is_custom']);
+    }
+
+    public function test_setting_pending_removes_the_record(): void
+    {
+        [$permohonan, $berkas] = $this->scenario();
+        PemeriksaanBerkas::create([
+            'permohonan_id' => $permohonan->id, 'berkas_item_id' => $berkas->id, 'status' => 'OK',
+        ]);
+
+        Livewire::test(ManagePemeriksaanBerkas::class)
+            ->set('selectedPermohonan', $permohonan->id)
+            ->call('setStatus', $berkas->id, 'PENDING');
+
+        $this->assertSame(0, PemeriksaanBerkas::where('permohonan_id', $permohonan->id)->count());
     }
 
     public function test_print_preview_modal_opens_and_shows_the_sheet(): void
@@ -96,8 +155,8 @@ class ManagePemeriksaanBerkasTest extends TestCase
         [$permohonan, $berkas] = $this->scenario();
 
         $c = Livewire::test(ManagePemeriksaanBerkas::class)->set('selectedPermohonan', $permohonan->id);
-        $c->call('startPeriksa', $berkas->id)->set('formStatus', 'OK')->call('savePeriksa');
-        $c->call('startPeriksa', $berkas->id)->set('formStatus', 'TOLAK')->call('savePeriksa');
+        $c->call('setStatus', $berkas->id, 'OK');
+        $c->call('setStatus', $berkas->id, 'TOLAK');
 
         $this->assertSame(1, PemeriksaanBerkas::where('permohonan_id', $permohonan->id)->count());
         $this->assertSame(PemeriksaanStatusEnum::TOLAK, PemeriksaanBerkas::first()->status);

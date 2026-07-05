@@ -9,7 +9,6 @@ use App\Models\PemeriksaanBerkas;
 use App\Models\Permohonan;
 use App\Support\PemeriksaanSheet;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -26,10 +25,12 @@ class ManagePemeriksaanBerkas extends Component
 {
     public string $selectedPermohonan = '';
 
-    // Inline check panel
-    public ?string $editingBerkasId = null;
+    /** Filter cepat daftar berkas berdasar nama (agar tak perlu menggulir daftar panjang). */
+    public string $search = '';
 
-    public string $formStatus = 'PENDING';
+    // Editor catatan inline (dibuka per berkas). Status di-set langsung lewat
+    // tombol segmented — tidak lagi lewat select box di dalam panel.
+    public ?string $editingBerkasId = null;
 
     public array $selectedCatatanIds = [];
 
@@ -37,6 +38,13 @@ class ManagePemeriksaanBerkas extends Component
 
     // Print preview modal
     public bool $showPrint = false;
+
+    /** Ganti permohonan mengosongkan pencarian & menutup editor. */
+    public function updatedSelectedPermohonan(): void
+    {
+        $this->search = '';
+        $this->cancelPeriksa();
+    }
 
     public function openPrint(): void
     {
@@ -48,14 +56,58 @@ class ManagePemeriksaanBerkas extends Component
         $this->showPrint = false;
     }
 
-    public function startPeriksa(string $berkasItemId): void
+    /**
+     * Set status berkas dalam satu klik. PENDING (default "belum diperiksa") tak
+     * disimpan — recordnya dihapus. OK langsung selesai; REVISI/TOLAK butuh
+     * alasan sehingga editor catatan dibuka otomatis. Catatan yang sudah ada
+     * dipertahankan saat status berubah.
+     */
+    public function setStatus(string $berkasItemId, string $status): void
+    {
+        // Nilai berasal dari tombol segmented (enum), tetap divalidasi defensif.
+        if (PemeriksaanStatusEnum::tryFrom($status) === null) {
+            return;
+        }
+
+        if ($status === PemeriksaanStatusEnum::PENDING->value) {
+            PemeriksaanBerkas::where('permohonan_id', $this->selectedPermohonan)
+                ->where('berkas_item_id', $berkasItemId)
+                ->delete();
+
+            if ($this->editingBerkasId === $berkasItemId) {
+                $this->cancelPeriksa();
+            }
+            session()->flash('message', 'Berkas dikembalikan ke PENDING.');
+
+            return;
+        }
+
+        $existing = PemeriksaanBerkas::where('permohonan_id', $this->selectedPermohonan)
+            ->where('berkas_item_id', $berkasItemId)
+            ->first();
+
+        PemeriksaanBerkas::updateOrCreate(
+            ['permohonan_id' => $this->selectedPermohonan, 'berkas_item_id' => $berkasItemId],
+            ['status' => $status, 'catatan' => $existing?->catatan, 'petugas_id' => Auth::id()],
+        );
+
+        // REVISI/TOLAK sebaiknya disertai alasan — buka editor catatan langsung.
+        // OK tak perlu catatan; tutup editor bila kebetulan terbuka untuk baris ini.
+        if (in_array($status, [PemeriksaanStatusEnum::REVISI->value, PemeriksaanStatusEnum::TOLAK->value], true)) {
+            $this->openCatatan($berkasItemId);
+        } elseif ($this->editingBerkasId === $berkasItemId) {
+            $this->cancelPeriksa();
+        }
+    }
+
+    /** Buka editor catatan untuk sebuah berkas (memuat catatan yang tersimpan). */
+    public function openCatatan(string $berkasItemId): void
     {
         $existing = PemeriksaanBerkas::where('permohonan_id', $this->selectedPermohonan)
             ->where('berkas_item_id', $berkasItemId)
             ->first();
 
         $this->editingBerkasId = $berkasItemId;
-        $this->formStatus = $existing?->status?->value ?? 'PENDING';
 
         $catatan = collect($existing?->catatan ?? []);
         $this->selectedCatatanIds = $catatan->where('is_custom', false)->pluck('id')->filter()->values()->all();
@@ -64,28 +116,24 @@ class ManagePemeriksaanBerkas extends Component
 
     public function cancelPeriksa(): void
     {
-        $this->reset(['editingBerkasId', 'formStatus', 'selectedCatatanIds', 'customCatatan']);
-        $this->formStatus = 'PENDING';
+        $this->reset(['editingBerkasId', 'selectedCatatanIds', 'customCatatan']);
     }
 
-    public function savePeriksa(): void
+    /** Simpan catatan untuk berkas yang sedang diedit (status tetap). */
+    public function saveCatatan(): void
     {
         $this->validate([
-            'formStatus' => ['required', Rule::enum(PemeriksaanStatusEnum::class)],
             'selectedCatatanIds' => ['array'],
             'customCatatan' => ['nullable', 'string'],
         ]);
 
-        // PENDING is the "unexamined" default — don't persist it. If a record
-        // already exists, delete it so the berkas reverts to PENDING; otherwise
-        // do nothing.
-        if ($this->formStatus === PemeriksaanStatusEnum::PENDING->value) {
-            PemeriksaanBerkas::where('permohonan_id', $this->selectedPermohonan)
-                ->where('berkas_item_id', $this->editingBerkasId)
-                ->delete();
+        $record = PemeriksaanBerkas::where('permohonan_id', $this->selectedPermohonan)
+            ->where('berkas_item_id', $this->editingBerkasId)
+            ->first();
 
+        // Catatan hanya bermakna bila berkas sudah punya status (bukan PENDING).
+        if (! $record) {
             $this->cancelPeriksa();
-            session()->flash('message', 'Pemeriksaan berkas dikembalikan ke PENDING.');
 
             return;
         }
@@ -98,13 +146,10 @@ class ManagePemeriksaanBerkas extends Component
             $catatan[] = ['id' => null, 'teks' => trim($this->customCatatan), 'is_custom' => true];
         }
 
-        PemeriksaanBerkas::updateOrCreate(
-            ['permohonan_id' => $this->selectedPermohonan, 'berkas_item_id' => $this->editingBerkasId],
-            ['status' => $this->formStatus, 'catatan' => $catatan ?: null, 'petugas_id' => Auth::id()],
-        );
+        $record->update(['catatan' => $catatan ?: null, 'petugas_id' => Auth::id()]);
 
         $this->cancelPeriksa();
-        session()->flash('message', 'Pemeriksaan berkas tersimpan.');
+        session()->flash('message', 'Catatan pemeriksaan tersimpan.');
     }
 
     public function render()
@@ -113,7 +158,7 @@ class ManagePemeriksaanBerkas extends Component
             ? Permohonan::with('layanan')->find($this->selectedPermohonan)
             : null;
 
-        $berkasList = $permohonan?->layanan_id
+        $allBerkas = $permohonan?->layanan_id
             ? MapLayananBerkas::with('berkasItem')
                 ->where('layanan_id', $permohonan->layanan_id)
                 ->orderBy('urutan')
@@ -121,6 +166,11 @@ class ManagePemeriksaanBerkas extends Component
                 ->pluck('berkasItem')
                 ->filter()
             : collect();
+
+        // Filter nama berkas (case-insensitive) tanpa mengubah urutan.
+        $berkasList = $this->search !== ''
+            ? $allBerkas->filter(fn ($b) => str_contains(mb_strtolower($b->nama), mb_strtolower(trim($this->search))))->values()
+            : $allBerkas;
 
         $pemeriksaan = $this->selectedPermohonan
             ? PemeriksaanBerkas::where('permohonan_id', $this->selectedPermohonan)->get()->keyBy('berkas_item_id')
@@ -145,6 +195,7 @@ class ManagePemeriksaanBerkas extends Component
             'permohonanList' => Permohonan::with('pemohon')->latest('created_at')->get(),
             'permohonan' => $permohonan,
             'berkasList' => $berkasList,
+            'hasBerkas' => $allBerkas->isNotEmpty(),
             'pemeriksaan' => $pemeriksaan,
             'catatanOptions' => $catatanOptions,
             'statuses' => PemeriksaanStatusEnum::cases(),

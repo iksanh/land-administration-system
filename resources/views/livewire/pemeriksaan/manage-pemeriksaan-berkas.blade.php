@@ -6,6 +6,20 @@
             'TOLAK' => 'bg-[#fff1f0] text-[#cf1322] border-[#ffa39e]',
             default => 'bg-gray-100 text-gray-600 border-gray-200',
         };
+        // Warna tombol saat status aktif dipilih (segmented control satu-klik).
+        $statusActive = fn ($s) => match ($s) {
+            'OK' => 'bg-[#389e0d] text-white',
+            'REVISI' => 'bg-[#d46b08] text-white',
+            'TOLAK' => 'bg-[#cf1322] text-white',
+            default => 'bg-gray-500 text-white',
+        };
+        $statusLabel = fn ($s) => match ($s) {
+            'PENDING' => 'Belum',
+            'OK' => 'OK',
+            'REVISI' => 'Revisi',
+            'TOLAK' => 'Tolak',
+            default => $s,
+        };
     @endphp
 
     <x-flash />
@@ -37,23 +51,29 @@
     </div>
 
     @if ($selectedPermohonan)
-        @if ($berkasList->isEmpty())
+        @if (! $hasBerkas)
             <div class="bg-white border border-gray-200 rounded-lg p-10 text-center text-gray-400">
                 Layanan permohonan ini belum memiliki berkas yang dipetakan (atur di Pemetaan Berkas).
             </div>
         @else
+            <x-search-bar model="search" placeholder="Cari nama berkas..." :count="$berkasList->count()" />
+
+            @if ($berkasList->isEmpty())
+                <div class="bg-white border border-gray-200 rounded-lg p-10 text-center text-gray-400">
+                    Tidak ada berkas yang cocok dengan "{{ $search }}".
+                    <button type="button" wire:click="$set('search', '')" class="text-[#1677ff] hover:underline ml-1">Hapus pencarian</button>
+                </div>
+            @else
             <div class="bg-white border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-100">
                 @foreach ($berkasList as $berkas)
-                    @php $row = $pemeriksaan->get($berkas->id); @endphp
-                    <div class="p-4">
-                        <div class="flex items-start justify-between gap-4">
-                            <div class="flex flex-col">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-medium text-gray-800">{{ $berkas->nama }}</span>
-                                    <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold border {{ $statusColor($row?->status?->value ?? 'PENDING') }}">
-                                        {{ $row?->status?->value ?? 'PENDING' }}
-                                    </span>
-                                </div>
+                    @php
+                        $row = $pemeriksaan->get($berkas->id);
+                        $cur = $row?->status?->value ?? 'PENDING';
+                    @endphp
+                    <div class="p-4" wire:key="berkas-{{ $berkas->id }}">
+                        <div class="flex items-start justify-between gap-4 flex-col sm:flex-row">
+                            <div class="flex flex-col min-w-0">
+                                <span class="font-medium text-gray-800">{{ $berkas->nama }}</span>
                                 @if ($row && $row->catatan)
                                     <ul class="mt-1 text-sm text-gray-500 list-disc list-inside">
                                         @foreach ($row->catatan as $c)
@@ -61,21 +81,35 @@
                                         @endforeach
                                     </ul>
                                 @endif
+                                {{-- Tombol edit catatan (untuk berkas yang sudah punya status). --}}
+                                @if ($cur !== 'PENDING' && $editingBerkasId !== $berkas->id)
+                                    <button wire:click="openCatatan('{{ $berkas->id }}')"
+                                        class="mt-1 self-start text-xs font-medium text-[#1677ff] hover:text-[#0958d9]">
+                                        {{ $row && $row->catatan ? '✎ Ubah catatan' : '＋ Tambah catatan' }}
+                                    </button>
+                                @endif
                             </div>
-                            <button wire:click="startPeriksa('{{ $berkas->id }}')" class="text-[#1677ff] hover:text-[#0958d9] font-medium text-xs shrink-0">Periksa</button>
+
+                            {{-- Segmented status: satu klik langsung tersimpan. --}}
+                            <div class="inline-flex rounded-md border border-gray-200 overflow-hidden shrink-0 shadow-sm"
+                                wire:loading.class="opacity-60 pointer-events-none" wire:target="setStatus">
+                                @foreach ($statuses as $s)
+                                    @php $active = $cur === $s->value; @endphp
+                                    <button type="button" wire:click="setStatus('{{ $berkas->id }}', '{{ $s->value }}')"
+                                        class="px-3 py-1.5 text-xs font-semibold border-l border-gray-200 first:border-l-0 transition-colors
+                                            {{ $active ? $statusActive($s->value) : 'bg-white text-gray-500 hover:bg-gray-50' }}">
+                                        @if ($active && $s->value === 'OK')✓ @endif{{ $statusLabel($s->value) }}
+                                    </button>
+                                @endforeach
+                            </div>
                         </div>
 
-                        {{-- Inline check panel --}}
+                        {{-- Editor catatan (muncul otomatis untuk REVISI/TOLAK, atau saat diklik). --}}
                         @if ($editingBerkasId === $berkas->id)
                             <div class="mt-3 bg-[#e6f4ff]/40 border border-[#91caff] rounded-md p-4 flex flex-col gap-3">
-                                <div class="flex flex-col gap-1.5">
-                                    <label class="text-[11px] font-semibold text-[#0958d9] uppercase">Status</label>
-                                    <select wire:model="formStatus" class="w-48 border border-[#91caff] rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#1677ff]">
-                                        @foreach ($statuses as $s)
-                                            <option value="{{ $s->value }}">{{ $s->value }}</option>
-                                        @endforeach
-                                    </select>
-                                    @error('formStatus') <span class="text-[10px] text-red-500">{{ $message }}</span> @enderror
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] font-semibold text-[#0958d9] uppercase">Catatan untuk berkas ber-status</span>
+                                    <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold border {{ $statusColor($cur) }}">{{ $cur }}</span>
                                 </div>
 
                                 @if ($catatanOptions->isNotEmpty())
@@ -98,14 +132,15 @@
                                 </div>
 
                                 <div class="flex gap-2">
-                                    <button wire:click="savePeriksa" class="bg-[#1677ff] hover:bg-[#0958d9] text-white rounded px-4 py-1.5 text-xs font-medium">Simpan Pemeriksaan</button>
-                                    <button wire:click="cancelPeriksa" class="bg-white border border-gray-300 text-gray-600 rounded px-4 py-1.5 text-xs">Batal</button>
+                                    <button wire:click="saveCatatan" class="bg-[#1677ff] hover:bg-[#0958d9] text-white rounded px-4 py-1.5 text-xs font-medium">Simpan Catatan</button>
+                                    <button wire:click="cancelPeriksa" class="bg-white border border-gray-300 text-gray-600 rounded px-4 py-1.5 text-xs">Tutup</button>
                                 </div>
                             </div>
                         @endif
                     </div>
                 @endforeach
             </div>
+            @endif
         @endif
     @else
         <div class="bg-white border border-gray-200 rounded-lg p-10 text-center text-gray-400">Pilih permohonan untuk memeriksa berkasnya.</div>
