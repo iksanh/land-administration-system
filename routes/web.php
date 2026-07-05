@@ -18,6 +18,7 @@ use App\Livewire\Pemeriksaan\ManagePemeriksaanBerkas;
 use App\Livewire\Pemohon\ManagePemohon;
 use App\Livewire\Panitia\ManagePanitia;
 use App\Livewire\Permohonan\ManagePermohonan;
+use App\Livewire\RiwayatTanah\CheckTypo;
 use App\Livewire\Tanah\ManageTanah;
 use App\Livewire\Users\ManageUsers;
 use App\Livewire\Wilayah\ManageWilayah;
@@ -48,6 +49,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/pemeriksaan-berkas', ManagePemeriksaanBerkas::class)->name('pemeriksaan-berkas');
     Route::get('/permohonan/{permohonan}/cetak-pemeriksaan', PemeriksaanPrintController::class)->name('pemeriksaan.print');
     Route::get('/audit-log', AuditLogTimeline::class)->name('audit-log');
+    Route::get('/cek-typo', CheckTypo::class)->name('cek-typo');
 
     // Berita Acara Pemeriksaan Lapang (Panitia A)
     Route::get('/panitia', ManagePanitia::class)->name('panitia');

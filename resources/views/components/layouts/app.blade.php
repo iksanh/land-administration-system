@@ -55,6 +55,10 @@
                     <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
                     Riwayat Status
                 </a>
+                <a href="{{ route('cek-typo') }}" wire:navigate class="{{ $cls('cek-typo') }}">
+                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+                    Cek Typo (AI)
+                </a>
 
                 <p class="{{ $heading }}">Master Data</p>
                 @foreach ([['Master Layanan', 'layanan'], ['Master Berkas', 'berkas-item'], ['Pemetaan Berkas', 'map-layanan-berkas'], ['Master Catatan', 'master-catatan'], ['Master Wilayah', 'wilayah'], ['Panitia Pemeriksa', 'panitia']] as [$label, $r])
