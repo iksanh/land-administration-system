@@ -6,6 +6,7 @@ use App\Livewire\Concerns\WithRiwayatPenguasaan;
 use App\Models\BeritaAcaraPemeriksaan;
 use App\Models\PanitiaPemeriksa;
 use App\Models\Permohonan;
+use App\Support\PanitiaResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
@@ -50,6 +51,12 @@ class ManageBeritaAcara extends Component
 
     /** @var array berkas foto baru yang diunggah */
     public array $newPhotos = [];
+
+    // Modal pratinjau cetak (mengikuti pola Pemeriksaan Berkas): dokumen ditampilkan
+    // di layar; tombol Cetak mencetak lewat iframe tersembunyi ke rute standalone.
+    public bool $showPrint = false;
+
+    public ?string $printId = null;
 
     public function mount(): void
     {
@@ -196,11 +203,41 @@ class ManageBeritaAcara extends Component
         $this->resetRiwayat();
     }
 
+    /** Buka modal pratinjau cetak untuk sebuah Berita Acara. */
+    public function openPrint(string $id): void
+    {
+        $this->printId = $id;
+        $this->showPrint = true;
+    }
+
+    public function closePrint(): void
+    {
+        $this->reset(['showPrint', 'printId']);
+    }
+
     public function render()
     {
         $editing = $this->editingId
             ? BeritaAcaraPemeriksaan::with('lampiran')->find($this->editingId)
             : null;
+
+        // Susun dokumen pratinjau hanya saat modal terbuka. Kepala desa aktif ikut
+        // sebagai penandatangan — sama seperti BeritaAcaraPrintController.
+        $printBa = null;
+        if ($this->showPrint && $this->printId) {
+            $printBa = BeritaAcaraPemeriksaan::with([
+                'permohonan.pemohon.desa.kepalaDesaAktif',
+                'permohonan.tanah.desa.kecamatan.kabupaten.provinsi',
+                'permohonan.tanah.desa.kepalaDesaAktif',
+                'permohonan.riwayatPenguasaan',
+                'panitia',
+                'lampiran',
+            ])->find($this->printId);
+
+            if ($printBa) {
+                $printBa->setRelation('panitia', PanitiaResolver::withKepalaDesa($printBa->panitia, $printBa->permohonan));
+            }
+        }
 
         return view('livewire.berita-acara.manage-berita-acara', [
             'list' => BeritaAcaraPemeriksaan::query()
@@ -222,6 +259,7 @@ class ManageBeritaAcara extends Component
                 : null,
             'kepalaDesaOtomatis' => ($selectedTanah?->tanah?->desa ?? $selectedTanah?->pemohon?->desa)?->kepalaDesaAktif ?? collect(),
             'lampiranList' => $editing?->lampiran ?? collect(),
+            'printBa' => $printBa,
         ]);
     }
 }

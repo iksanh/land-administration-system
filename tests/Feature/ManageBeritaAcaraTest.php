@@ -129,6 +129,31 @@ class ManageBeritaAcaraTest extends TestCase
         $this->assertDatabaseMissing('berita_acara_pemeriksaan', ['id' => $ba->id]);
     }
 
+    public function test_print_preview_modal_renders_document(): void
+    {
+        $p = $this->permohonan();
+        $ba = BeritaAcaraPemeriksaan::create([
+            'permohonan_id' => $p->id,
+            'tgl_pemeriksaan' => '2025-01-13',
+        ]);
+        RiwayatPenguasaan::create(['permohonan_id' => $p->id, 'poin' => ['Dikuasai sejak 1996.']]);
+
+        Livewire::test(ManageBeritaAcara::class)
+            // Modal tertutup: dokumen belum dirender.
+            ->assertSet('showPrint', false)
+            ->assertDontSee('Pratinjau Berita Acara Pemeriksaan Lapang')
+            ->call('openPrint', $ba->id)
+            ->assertSet('showPrint', true)
+            ->assertSet('printId', $ba->id)
+            // Dokumen dirender inline di dalam modal (bukan tab baru).
+            ->assertSee('Pratinjau Berita Acara Pemeriksaan Lapang')
+            ->assertSee('Abdul Wahab Thaib')
+            ->assertSee('Dikuasai sejak 1996.')
+            ->call('closePrint')
+            ->assertSet('showPrint', false)
+            ->assertSet('printId', null);
+    }
+
     public function test_print_page_renders(): void
     {
         $user = User::create([
