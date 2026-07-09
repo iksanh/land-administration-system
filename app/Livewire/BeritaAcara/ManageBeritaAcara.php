@@ -214,9 +214,13 @@ class ManageBeritaAcara extends Component
                 ->latest('created_at')->get(),
             'permohonanList' => Permohonan::with('pemohon')->orderBy('nomor_registrasi')->get(),
             'panitiaList' => PanitiaPemeriksa::where('is_active', true)->orderBy('urutan')->orderBy('nama')->get(),
-            'selectedTanah' => $this->permohonan_id
-                ? Permohonan::with(['tanah.desa.kecamatan.kabupaten.provinsi', 'pemohon'])->find($this->permohonan_id)
+            'selectedTanah' => $selectedTanah = $this->permohonan_id
+                ? Permohonan::with([
+                    'tanah.desa.kecamatan.kabupaten.provinsi', 'tanah.desa.kepalaDesaAktif',
+                    'pemohon.desa.kepalaDesaAktif',
+                ])->find($this->permohonan_id)
                 : null,
+            'kepalaDesaOtomatis' => ($selectedTanah?->tanah?->desa ?? $selectedTanah?->pemohon?->desa)?->kepalaDesaAktif ?? collect(),
             'lampiranList' => $editing?->lampiran ?? collect(),
         ]);
     }

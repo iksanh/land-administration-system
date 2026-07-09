@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BeritaAcaraPemeriksaan;
+use App\Support\PanitiaResolver;
 use Illuminate\Http\Response;
 use Illuminate\Support\Str;
 
@@ -16,12 +17,16 @@ class BeritaAcaraWordController extends Controller
     public function __invoke(BeritaAcaraPemeriksaan $beritaAcara): Response
     {
         $beritaAcara->load([
-            'permohonan.pemohon',
+            'permohonan.pemohon.desa.kepalaDesaAktif',
             'permohonan.tanah.desa.kecamatan.kabupaten.provinsi',
+            'permohonan.tanah.desa.kepalaDesaAktif',
             'permohonan.riwayatPenguasaan',
             'panitia',
             'lampiran',
         ]);
+
+        // Kepala desa aktif dari desa lokasi tanah ikut sebagai penandatangan.
+        $beritaAcara->setRelation('panitia', PanitiaResolver::withKepalaDesa($beritaAcara->panitia, $beritaAcara->permohonan));
 
         $html = view('berita-acara.word', ['ba' => $beritaAcara])->render();
 

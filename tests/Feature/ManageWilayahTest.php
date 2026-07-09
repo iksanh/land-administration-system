@@ -6,6 +6,7 @@ use App\Livewire\Wilayah\ManageWilayah;
 use App\Models\RefDesa;
 use App\Models\RefKabupaten;
 use App\Models\RefKecamatan;
+use App\Models\RefKepalaDesa;
 use App\Models\RefProvinsi;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -82,5 +83,83 @@ class ManageWilayahTest extends TestCase
             'id' => '7503012001', 'kecamatan_id' => '750301', 'nama' => 'OLUHUTA', 'nama_kepala_desa' => 'Pak Kades',
         ]);
         $this->assertSame(1, RefDesa::where('kecamatan_id', '750301')->count());
+    }
+
+    private function seedDesa(): RefDesa
+    {
+        RefProvinsi::create(['id' => '75', 'nama' => 'GORONTALO']);
+        RefKabupaten::create(['id' => '7503', 'provinsi_id' => '75', 'nama' => 'BONE BOLANGO']);
+        RefKecamatan::create(['id' => '750301', 'kabupaten_id' => '7503', 'nama' => 'KABILA']);
+
+        return RefDesa::create(['id' => '7503012001', 'kecamatan_id' => '750301', 'nama' => 'OLUHUTA']);
+    }
+
+    public function test_can_add_multiple_kepala_desa(): void
+    {
+        $desa = $this->seedDesa();
+
+        Livewire::test(ManageWilayah::class)
+            ->call('manageKades', $desa->id)
+            ->set('kadesNama', 'Yusuf Ali')
+            ->set('kadesPeriode', '2019-2025')
+            ->call('saveKades')
+            ->assertHasNoErrors()
+            ->set('kadesNama', 'Rahman Dai')
+            ->set('kadesAktif', false)
+            ->call('saveKades')
+            ->assertHasNoErrors();
+
+        $this->assertSame(2, RefKepalaDesa::where('desa_id', $desa->id)->count());
+        $this->assertDatabaseHas('ref_kepala_desa', [
+            'desa_id' => $desa->id, 'nama' => 'Yusuf Ali', 'periode' => '2019-2025', 'is_active' => true,
+        ]);
+    }
+
+    public function test_kepala_desa_name_is_required(): void
+    {
+        $desa = $this->seedDesa();
+
+        Livewire::test(ManageWilayah::class)
+            ->call('manageKades', $desa->id)
+            ->set('kadesNama', '')
+            ->call('saveKades')
+            ->assertHasErrors(['kadesNama' => 'required']);
+    }
+
+    public function test_can_toggle_kepala_desa_active(): void
+    {
+        $desa = $this->seedDesa();
+        $kd = RefKepalaDesa::create(['desa_id' => $desa->id, 'nama' => 'Yusuf Ali', 'is_active' => true]);
+
+        Livewire::test(ManageWilayah::class)
+            ->call('manageKades', $desa->id)
+            ->call('toggleKades', $kd->id);
+
+        $this->assertFalse($kd->refresh()->is_active);
+    }
+
+    public function test_can_delete_kepala_desa(): void
+    {
+        $desa = $this->seedDesa();
+        $kd = RefKepalaDesa::create(['desa_id' => $desa->id, 'nama' => 'Yusuf Ali']);
+
+        Livewire::test(ManageWilayah::class)
+            ->call('manageKades', $desa->id)
+            ->call('deleteKades', $kd->id);
+
+        $this->assertDatabaseMissing('ref_kepala_desa', ['id' => $kd->id]);
+    }
+
+    public function test_desa_list_shows_active_kepala_desa_count(): void
+    {
+        $desa = $this->seedDesa();
+        RefKepalaDesa::create(['desa_id' => $desa->id, 'nama' => 'Aktif', 'is_active' => true]);
+        RefKepalaDesa::create(['desa_id' => $desa->id, 'nama' => 'Nonaktif', 'is_active' => false]);
+
+        Livewire::test(ManageWilayah::class)
+            ->call('selectProvinsi', '75')
+            ->call('selectKabupaten', '7503')
+            ->call('selectKecamatan', '750301')
+            ->assertViewHas('desaList', fn ($list) => $list->first()->kepala_desa_aktif_count === 1);
     }
 }

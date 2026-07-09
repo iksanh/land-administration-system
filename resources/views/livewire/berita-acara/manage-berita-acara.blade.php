@@ -111,6 +111,14 @@
                     </div>
                 @endif
                 @error('selectedPanitia.*') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+
+                @if ($kepalaDesaOtomatis->isNotEmpty())
+                    <div class="rounded-md border border-[#b7eb8f] bg-[#f6ffed] px-3 py-2 text-xs text-[#389e0d]">
+                        Otomatis ditambahkan sebagai penandatangan (Kepala Desa aktif di lokasi tanah):
+                        <span class="font-medium">{{ $kepalaDesaOtomatis->pluck('nama')->join(', ') }}</span>.
+                        Kelola daftarnya di menu <a href="{{ route('wilayah') }}" class="underline" wire:navigate>Master Wilayah</a>.
+                    </div>
+                @endif
             </div>
 
             {{-- Lampiran foto --}}
