@@ -132,6 +132,28 @@ class ManageRisalahTest extends TestCase
         $this->assertDatabaseMissing('risalah_panitia_a', ['id' => $r->id]);
     }
 
+    public function test_print_preview_modal_renders_document(): void
+    {
+        $p = $this->permohonan();
+        $r = RisalahPanitiaA::create(['permohonan_id' => $p->id, 'tgl_risalah' => '2025-01-13']);
+        RiwayatPenguasaan::create(['permohonan_id' => $p->id, 'poin' => ['Dikuasai sejak 1996.']]);
+
+        Livewire::test(ManageRisalah::class)
+            // Modal tertutup: dokumen belum dirender.
+            ->assertSet('showPrint', false)
+            ->assertDontSee('Pratinjau Risalah Panitia Pemeriksaan Tanah')
+            ->call('openPrint', $r->id)
+            ->assertSet('showPrint', true)
+            ->assertSet('printId', $r->id)
+            // Dokumen dirender inline di dalam modal (bukan tab baru).
+            ->assertSee('Pratinjau Risalah Panitia Pemeriksaan Tanah')
+            ->assertSee('Abdul Wahab Thaib')
+            ->assertSee('Dikuasai sejak 1996.')
+            ->call('closePrint')
+            ->assertSet('showPrint', false)
+            ->assertSet('printId', null);
+    }
+
     public function test_print_page_renders(): void
     {
         $user = User::create([

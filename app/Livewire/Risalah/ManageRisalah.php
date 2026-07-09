@@ -8,6 +8,7 @@ use App\Models\BeritaAcaraPemeriksaan;
 use App\Models\PanitiaPemeriksa;
 use App\Models\Permohonan;
 use App\Models\RisalahPanitiaA;
+use App\Support\PanitiaResolver;
 use App\Support\RisalahDefaults;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
@@ -68,6 +69,12 @@ class ManageRisalah extends Component
 
     /** Modal detail riwayat penguasaan (read-only, referensi Berita Acara). */
     public bool $showRiwayatModal = false;
+
+    // Modal pratinjau cetak (mengikuti pola Pemeriksaan Berkas & Berita Acara):
+    // dokumen ditampilkan di layar; tombol Cetak mencetak lewat iframe tersembunyi.
+    public bool $showPrint = false;
+
+    public ?string $printId = null;
 
     public function mount(): void
     {
@@ -131,6 +138,18 @@ class ManageRisalah extends Component
     public function closeRiwayatModal(): void
     {
         $this->showRiwayatModal = false;
+    }
+
+    /** Buka modal pratinjau cetak untuk sebuah Risalah. */
+    public function openPrint(string $id): void
+    {
+        $this->printId = $id;
+        $this->showPrint = true;
+    }
+
+    public function closePrint(): void
+    {
+        $this->reset(['showPrint', 'printId']);
     }
 
     public function edit(string $id): void
@@ -261,7 +280,26 @@ class ManageRisalah extends Component
 
     public function render()
     {
+        // Susun dokumen pratinjau hanya saat modal terbuka. Kepala desa aktif ikut
+        // sebagai penandatangan — sama seperti RisalahPrintController.
+        $printRisalah = null;
+        if ($this->showPrint && $this->printId) {
+            $printRisalah = RisalahPanitiaA::with([
+                'permohonan.pemohon.desa.kecamatan.kabupaten.provinsi',
+                'permohonan.pemohon.desa.kepalaDesaAktif',
+                'permohonan.tanah.desa.kecamatan.kabupaten.provinsi',
+                'permohonan.tanah.desa.kepalaDesaAktif',
+                'permohonan.riwayatPenguasaan',
+                'panitia',
+            ])->find($this->printId);
+
+            if ($printRisalah) {
+                $printRisalah->setRelation('panitia', PanitiaResolver::withKepalaDesa($printRisalah->panitia, $printRisalah->permohonan));
+            }
+        }
+
         return view('livewire.risalah.manage-risalah', [
+            'printRisalah' => $printRisalah,
             'list' => RisalahPanitiaA::query()
                 ->with(['permohonan.pemohon'])
                 ->when($this->search !== '', function ($q) {

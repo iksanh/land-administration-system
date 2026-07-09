@@ -226,10 +226,10 @@
                     {{ $editingId ? 'Simpan Perubahan' : 'Simpan Risalah' }}
                 </button>
                 @if ($editingId)
-                    <a href="{{ route('risalah.print', $editingId) }}" target="_blank"
+                    <button type="button" wire:click="openPrint('{{ $editingId }}')"
                         class="bg-white border border-[#1677ff] text-[#1677ff] hover:bg-[#e6f4ff] px-6 py-2 rounded-md font-medium text-sm inline-flex items-center gap-2">
-                        🖨️ Cetak / Preview PDF
-                    </a>
+                        🖨️ Cetak / Pratinjau
+                    </button>
                     <a href="{{ route('risalah.word', $editingId) }}"
                         class="bg-white border border-[#52c41a] text-[#389e0d] hover:bg-[#f6ffed] px-6 py-2 rounded-md font-medium text-sm inline-flex items-center gap-2">
                         ⬇️ Download Word
@@ -265,10 +265,10 @@
                         <td class="px-4 py-3">
                             <div class="flex items-center justify-center gap-2 flex-wrap">
                                 <x-action-btn icon="edit" variant="primary" wire:click="edit('{{ $r->id }}')">Edit</x-action-btn>
-                                <a href="{{ route('risalah.print', $r->id) }}" target="_blank"
+                                <button type="button" wire:click="openPrint('{{ $r->id }}')"
                                     class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border bg-white transition-colors text-[#722ed1] border-[#d3adf7] hover:bg-[#f9f0ff] hover:border-[#722ed1]">
                                     🖨️ Cetak
-                                </a>
+                                </button>
                                 <a href="{{ route('risalah.word', $r->id) }}"
                                     class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border bg-white transition-colors text-[#389e0d] border-[#b7eb8f] hover:bg-[#f6ffed] hover:border-[#52c41a]">
                                     ⬇️ Word
@@ -322,6 +322,40 @@
                     <button type="button" wire:click="closeRiwayatModal" class="bg-[#1677ff] hover:bg-[#0958d9] text-white rounded-md px-4 py-1.5 text-sm font-medium">Selesai</button>
                 </div>
             </div>
+        </div>
+    @endif
+
+    {{-- Modal pratinjau cetak: menampilkan dokumen di layar; tombol Cetak mencetak
+         lewat iframe tersembunyi yang memuat rute standalone, sehingga dialog printer
+         menerima persis dokumennya (tanpa chrome aplikasi). --}}
+    @if ($showPrint && $printRisalah)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" wire:key="risalah-print-modal"
+            x-data="{
+                cetak() {
+                    const frame = document.getElementById('risalah-print-frame');
+                    frame.onload = () => { frame.contentWindow.focus(); frame.contentWindow.print(); };
+                    frame.src = '{{ route('risalah.print', $printRisalah->id) }}?t=' + Date.now();
+                }
+            }">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+                    <h3 class="font-semibold text-gray-800">Pratinjau Risalah Panitia Pemeriksaan Tanah "A"</h3>
+                    <div class="flex gap-2">
+                        <button type="button" x-on:click="cetak()" class="inline-flex items-center gap-2 bg-[#1677ff] hover:bg-[#0958d9] text-white rounded-md px-4 py-1.5 text-sm font-medium">🖨️ Cetak</button>
+                        <a href="{{ route('risalah.word', $printRisalah->id) }}"
+                            class="inline-flex items-center gap-2 bg-white border border-[#52c41a] text-[#389e0d] hover:bg-[#f6ffed] rounded-md px-4 py-1.5 text-sm font-medium">⬇️ Word</a>
+                        <button type="button" wire:click="closePrint" class="bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-1.5 text-sm hover:bg-gray-50">Tutup</button>
+                    </div>
+                </div>
+                <div class="overflow-y-auto p-6 bg-gray-100">
+                    <div class="bg-white shadow-sm mx-auto p-8" style="max-width:21cm;">
+                        @include('risalah._dokumen', ['r' => $printRisalah, 'mode' => 'print'])
+                    </div>
+                </div>
+            </div>
+            {{-- Off-screen (bukan display:none — iframe tersembunyi tak tercetak di sebagian browser). --}}
+            <iframe id="risalah-print-frame" aria-hidden="true" tabindex="-1"
+                style="position: absolute; width: 0; height: 0; border: 0; visibility: hidden;"></iframe>
         </div>
     @endif
 </div>
