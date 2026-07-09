@@ -45,7 +45,7 @@
                 </a>
 
                 <p class="{{ $heading }}">Alur Permohonan</p>
-                @foreach ([['Data Pemohon', 'pemohon'], ['Data Tanah', 'tanah'], ['Permohonan', 'permohonan'], ['Pemeriksaan Berkas', 'pemeriksaan-berkas'], ['Berita Acara Lapang', 'berita-acara']] as $i => [$label, $r])
+                @foreach ([['Data Pemohon', 'pemohon'], ['Data Tanah', 'tanah'], ['Permohonan', 'permohonan'], ['Pemeriksaan Berkas', 'pemeriksaan-berkas'], ['Berita Acara Lapang', 'berita-acara'], ['Risalah Panitia A', 'risalah']] as $i => [$label, $r])
                     <a href="{{ route($r) }}" wire:navigate class="{{ $cls($r) }}">
                         <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 {{ $isActive($r) ? 'bg-white text-[#1677ff]' : 'bg-white/10 text-gray-300' }}">{{ $i + 1 }}</span>
                         {{ $label }}

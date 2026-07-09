@@ -135,6 +135,10 @@
                                     class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border bg-white transition-colors text-[#08979c] border-[#87e8de] hover:bg-[#e6fffb] hover:border-[#08979c]">
                                     Berita Acara
                                 </a>
+                                <a href="{{ route('risalah', ['permohonan' => $p->id]) }}" wire:navigate
+                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border bg-white transition-colors text-[#531dab] border-[#d3adf7] hover:bg-[#f9f0ff] hover:border-[#531dab]">
+                                    Risalah
+                                </a>
                                 @if ($p->status->value === 'DRAFT')
                                     <x-action-btn icon="delete" variant="danger" wire:click="delete('{{ $p->id }}')" wire:confirm="Hapus permohonan {{ $p->nomor_registrasi }}?">Hapus</x-action-btn>
                                 @endif

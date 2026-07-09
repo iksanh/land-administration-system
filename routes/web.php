@@ -3,21 +3,24 @@
 use App\Http\Controllers\BeritaAcaraPrintController;
 use App\Http\Controllers\BeritaAcaraWordController;
 use App\Http\Controllers\PemeriksaanPrintController;
+use App\Http\Controllers\RisalahPrintController;
+use App\Http\Controllers\RisalahWordController;
 use App\Livewire\AuditLog\AuditLogTimeline;
 use App\Livewire\Auth\ForgotPassword;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\ManageMfa;
 use App\Livewire\Auth\ResetPassword;
-use App\Livewire\Berkas\ManageBerkasItem;
 use App\Livewire\BeritaAcara\ManageBeritaAcara;
+use App\Livewire\Berkas\ManageBerkasItem;
 use App\Livewire\Berkas\ManageMapLayananBerkas;
 use App\Livewire\Catatan\ManageMstCatatan;
 use App\Livewire\Dashboard;
 use App\Livewire\Layanan\ManageLayanan;
+use App\Livewire\Panitia\ManagePanitia;
 use App\Livewire\Pemeriksaan\ManagePemeriksaanBerkas;
 use App\Livewire\Pemohon\ManagePemohon;
-use App\Livewire\Panitia\ManagePanitia;
 use App\Livewire\Permohonan\ManagePermohonan;
+use App\Livewire\Risalah\ManageRisalah;
 use App\Livewire\RiwayatTanah\CheckTypo;
 use App\Livewire\Tanah\ManageTanah;
 use App\Livewire\Users\ManageUsers;
@@ -56,6 +59,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/berita-acara', ManageBeritaAcara::class)->name('berita-acara');
     Route::get('/berita-acara/{beritaAcara}/cetak', BeritaAcaraPrintController::class)->name('berita-acara.print');
     Route::get('/berita-acara/{beritaAcara}/word', BeritaAcaraWordController::class)->name('berita-acara.word');
+
+    // Risalah Panitia Pemeriksaan Tanah "A" (superset dari Berita Acara)
+    Route::get('/risalah', ManageRisalah::class)->name('risalah');
+    Route::get('/risalah/{risalah}/cetak', RisalahPrintController::class)->name('risalah.print');
+    Route::get('/risalah/{risalah}/word', RisalahWordController::class)->name('risalah.word');
 
     // Account security — per-user, opt-in TOTP MFA
     Route::get('/keamanan', ManageMfa::class)->name('mfa');
