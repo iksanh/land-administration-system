@@ -81,12 +81,26 @@ class ManagePermohonan extends Component
         }
 
         if ($this->editingId) {
-            // Status is changed only via changeStatus(), never the main form.
+            // Status is changed only via the stepper actions, never the main form.
             Permohonan::findOrFail($this->editingId)->update($data);
             session()->flash('message', 'Permohonan berhasil diperbarui.');
         } else {
-            Permohonan::create($data);
-            session()->flash('message', 'Permohonan berhasil dibuat.');
+            // Alur otomatis: selesai input, permohonan langsung masuk tahap
+            // Periksa Berkas (Staf Korsub) — tercatat di audit log seperti
+            // perubahan manual sehingga jejaknya tetap lengkap.
+            DB::transaction(function () use ($data) {
+                $p = Permohonan::create($data + ['status' => PermohonanStatusEnum::PERIKSA_BERKAS_STAF]);
+
+                PermohonanAuditLog::create([
+                    'permohonan_id' => $p->id,
+                    'status_sebelumnya' => PermohonanStatusEnum::DRAFT,
+                    'status_baru' => PermohonanStatusEnum::PERIKSA_BERKAS_STAF,
+                    'petugas_id' => Auth::id(),
+                    'catatan' => 'Otomatis: permohonan selesai diinput.',
+                ]);
+            });
+
+            session()->flash('message', 'Permohonan berhasil dibuat dan langsung masuk tahap Periksa Berkas (Staf Korsub).');
         }
 
         $this->resetForm();

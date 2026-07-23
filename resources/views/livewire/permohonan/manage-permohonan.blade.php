@@ -168,6 +168,7 @@
                                 <x-action-menu.item icon="status" variant="purple" wire:click="startStatusChange('{{ $p->id }}')">Ubah Status</x-action-menu.item>
                                 <x-action-menu.item icon="edit" variant="primary" wire:click="edit('{{ $p->id }}')">Edit</x-action-menu.item>
                                 <x-action-menu.divider />
+                                <x-action-menu.item icon="check-doc" variant="green" :href="route('pemeriksaan-berkas', ['permohonan' => $p->id])" wire:navigate>Periksa Berkas</x-action-menu.item>
                                 <x-action-menu.item icon="doc" variant="cyan" :href="route('berita-acara', ['permohonan' => $p->id])" wire:navigate>Berita Acara</x-action-menu.item>
                                 <x-action-menu.item icon="doc" variant="purple" :href="route('risalah', ['permohonan' => $p->id])" wire:navigate>Risalah</x-action-menu.item>
                                 @if ($p->status->value === 'DRAFT')

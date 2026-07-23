@@ -26,16 +26,27 @@ class ManagePermohonanTest extends TestCase
         ]);
     }
 
-    public function test_can_create_permohonan_defaulting_to_draft(): void
+    public function test_create_auto_advances_to_periksa_berkas_staf_with_audit_log(): void
     {
-        Livewire::test(ManagePermohonan::class)
+        $petugas = $this->userWithRoles(['petugas']);
+
+        Livewire::actingAs($petugas)
+            ->test(ManagePermohonan::class)
             ->set('nomor_registrasi', 'REG-2026-001')
             ->call('save')
             ->assertHasNoErrors();
 
         $p = Permohonan::where('nomor_registrasi', 'REG-2026-001')->first();
         $this->assertNotNull($p);
-        $this->assertSame(PermohonanStatusEnum::DRAFT, $p->status);
+        // Alur otomatis: selesai input langsung masuk Periksa Berkas (Staf Korsub).
+        $this->assertSame(PermohonanStatusEnum::PERIKSA_BERKAS_STAF, $p->status);
+
+        $log = PermohonanAuditLog::where('permohonan_id', $p->id)->first();
+        $this->assertNotNull($log);
+        $this->assertSame(PermohonanStatusEnum::DRAFT, $log->status_sebelumnya);
+        $this->assertSame(PermohonanStatusEnum::PERIKSA_BERKAS_STAF, $log->status_baru);
+        $this->assertSame($petugas->id, $log->petugas_id);
+        $this->assertSame('Otomatis: permohonan selesai diinput.', $log->catatan);
     }
 
     public function test_nomor_registrasi_must_be_unique(): void

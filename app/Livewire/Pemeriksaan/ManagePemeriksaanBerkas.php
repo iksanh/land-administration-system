@@ -3,12 +3,15 @@
 namespace App\Livewire\Pemeriksaan;
 
 use App\Enums\PemeriksaanStatusEnum;
+use App\Enums\PermohonanStatusEnum;
 use App\Models\MapLayananBerkas;
 use App\Models\MstCatatan;
 use App\Models\PemeriksaanBerkas;
 use App\Models\Permohonan;
+use App\Models\PermohonanAuditLog;
 use App\Support\PemeriksaanSheet;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -48,6 +51,20 @@ class ManagePemeriksaanBerkas extends Component
     // Print preview modal
     public bool $showPrint = false;
 
+    /**
+     * Dukung tautan langsung dari halaman lain (mis. tombol aksi di
+     * /permohonan): /pemeriksaan-berkas?permohonan=<id> membuka halaman
+     * dengan permohonan tsb. sudah terpilih.
+     */
+    public function mount(): void
+    {
+        $pid = request('permohonan');
+
+        if ($pid && Permohonan::whereKey($pid)->exists()) {
+            $this->selectedPermohonan = $pid;
+        }
+    }
+
     /** Ganti permohonan mengosongkan pencarian & menutup editor. */
     public function updatedSelectedPermohonan(): void
     {
@@ -69,6 +86,75 @@ class ManagePemeriksaanBerkas extends Component
         $this->selectedPermohonan = '';
         $this->permohonanSearch = '';
         $this->updatedSelectedPermohonan();
+    }
+
+    /** Tahap-tahap alur yang pekerjaannya ada di halaman ini. */
+    private const PERIKSA_STAGES = [
+        PermohonanStatusEnum::PERIKSA_BERKAS_STAF,
+        PermohonanStatusEnum::PERIKSA_BERKAS_KORSUB,
+    ];
+
+    /**
+     * Selesai memeriksa: bila seluruh berkas pada checklist berstatus OK,
+     * permohonan maju satu tahap (Staf → Korsub, atau Korsub → Proses Daftar)
+     * dan tercatat di audit log. Gerbang role tahap tetap berlaku.
+     */
+    public function selesaiPeriksa(): void
+    {
+        $p = Permohonan::findOrFail($this->selectedPermohonan);
+
+        if (! in_array($p->status, self::PERIKSA_STAGES, true)) {
+            return;
+        }
+
+        $user = Auth::user();
+        if (! $user || (! $user->isAdmin() && ! collect($p->status->allowedRoles())->contains(fn ($r) => $user->hasRole($r)))) {
+            session()->flash('error', "Anda tidak berwenang menyelesaikan tahap \"{$p->status->label()}\" — tahap ini diproses oleh role {$p->status->allowedRoleLabels()}.");
+
+            return;
+        }
+
+        $stat = $this->periksaStat($p);
+        if ($stat['total'] === 0 || $stat['ok'] < $stat['total']) {
+            session()->flash('error', 'Seluruh berkas harus berstatus OK sebelum lanjut ke tahap berikutnya.');
+
+            return;
+        }
+
+        $next = $p->status->next();
+        $old = $p->status;
+
+        DB::transaction(function () use ($p, $old, $next, $stat) {
+            $p->update(['status' => $next]);
+
+            PermohonanAuditLog::create([
+                'permohonan_id' => $p->id,
+                'status_sebelumnya' => $old,
+                'status_baru' => $next,
+                'petugas_id' => Auth::id(),
+                'catatan' => "Otomatis: seluruh {$stat['total']} berkas OK — {$old->label()} selesai.",
+            ]);
+        });
+
+        session()->flash('message', "Pemeriksaan selesai — status maju ke {$next->label()}.");
+    }
+
+    /** Hitung progres pemeriksaan untuk checklist permohonan ini. */
+    private function periksaStat(Permohonan $p): array
+    {
+        $berkasIds = $p->layanan_id
+            ? MapLayananBerkas::where('layanan_id', $p->layanan_id)->pluck('berkas_item_id')
+            : collect();
+
+        $rows = PemeriksaanBerkas::where('permohonan_id', $p->id)
+            ->whereIn('berkas_item_id', $berkasIds)
+            ->get();
+
+        return [
+            'total' => $berkasIds->count(),
+            'checked' => $rows->count(),
+            'ok' => $rows->where('status', PemeriksaanStatusEnum::OK)->count(),
+        ];
     }
 
     public function openPrint(): void
@@ -226,7 +312,15 @@ class ManagePemeriksaanBerkas extends Component
             })
             ->latest('created_at');
 
+        // Panel "selesai periksa" hanya relevan saat permohonan sedang di
+        // tahap pemeriksaan berkas (Staf/Korsub).
+        $periksaStage = $permohonan && in_array($permohonan->status, self::PERIKSA_STAGES, true);
+        $user = Auth::user();
+
         return view('livewire.pemeriksaan.manage-pemeriksaan-berkas', [
+            'periksaStat' => $periksaStage ? $this->periksaStat($permohonan) : null,
+            'canSelesai' => $periksaStage && $user
+                && ($user->isAdmin() || collect($permohonan->status->allowedRoles())->contains(fn ($r) => $user->hasRole($r))),
             'permohonanList' => (clone $permohonanQuery)->limit(self::PERMOHONAN_LIMIT)->get(),
             'permohonanTotal' => $permohonanQuery->count(),
             'permohonanLimit' => self::PERMOHONAN_LIMIT,

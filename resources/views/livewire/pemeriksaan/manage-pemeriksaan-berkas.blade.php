@@ -98,6 +98,46 @@
     </div>
 
     @if ($selectedPermohonan)
+        {{-- Progres pemeriksaan + tombol lanjut tahap (hanya di tahap periksa Staf/Korsub) --}}
+        @if ($permohonan && $periksaStat && $periksaStat['total'] > 0)
+            @php
+                $allOk = $periksaStat['ok'] === $periksaStat['total'];
+                $next = $permohonan->status->next();
+                $bermasalah = $periksaStat['checked'] - $periksaStat['ok'];
+            @endphp
+            <div class="rounded-lg border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 {{ $allOk ? 'bg-[#f6ffed]/70 border-[#b7eb8f]' : 'bg-white border-gray-200' }}">
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-gray-800">
+                        Tahap: <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold border align-middle {{ $permohonan->status->badgeClass() }}">{{ $permohonan->status->label() }}</span>
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1.5">
+                        {{ $periksaStat['checked'] }}/{{ $periksaStat['total'] }} berkas diperiksa
+                        · <span class="text-[#389e0d] font-medium">{{ $periksaStat['ok'] }} OK</span>
+                        @if ($bermasalah > 0)
+                            · <span class="text-[#d46b08] font-medium">{{ $bermasalah }} revisi/tolak</span>
+                        @endif
+                    </p>
+                    <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-2 max-w-xs">
+                        <div class="h-full rounded-full {{ $allOk ? 'bg-[#52c41a]' : 'bg-[#1677ff]' }}"
+                            style="width: {{ round($periksaStat['ok'] / $periksaStat['total'] * 100) }}%"></div>
+                    </div>
+                </div>
+                <div class="shrink-0">
+                    @if (! $canSelesai)
+                        <p class="text-xs text-gray-400 max-w-52">🔒 Tahap ini diselesaikan oleh role {{ $permohonan->status->allowedRoleLabels() }}.</p>
+                    @elseif ($allOk && $next)
+                        <button type="button" wire:click="selesaiPeriksa"
+                            wire:confirm="Selesaikan pemeriksaan dan majukan status ke {{ $next->label() }}?"
+                            class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-[#389e0d] hover:bg-[#237804] text-white shadow-sm">
+                            ✓ Selesai — Lanjut ke {{ $next->label() }}
+                        </button>
+                    @else
+                        <p class="text-xs text-gray-400 max-w-52">Seluruh berkas harus <span class="font-semibold text-[#389e0d]">OK</span> untuk lanjut ke tahap berikutnya.</p>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         @if (! $hasBerkas)
             <div class="bg-white border border-gray-200 rounded-lg p-10 text-center text-gray-400">
                 Layanan permohonan ini belum memiliki berkas yang dipetakan (atur di Pemetaan Berkas).

@@ -54,6 +54,102 @@ class ManagePemeriksaanBerkasTest extends TestCase
             ->assertViewHas('hasBerkas', true);
     }
 
+    private function userWithRoles(array $roles): \App\Models\User
+    {
+        return \App\Models\User::create([
+            'name' => 'User '.implode('-', $roles), 'email' => uniqid().'@app.com',
+            'hashed_password' => \Illuminate\Support\Facades\Hash::make('x'),
+            'roles' => $roles, 'is_active' => true,
+        ]);
+    }
+
+    public function test_selesai_periksa_advances_stage_when_all_berkas_ok(): void
+    {
+        [$permohonan, $berkas] = $this->scenario();
+        $permohonan->update(['status' => \App\Enums\PermohonanStatusEnum::PERIKSA_BERKAS_STAF]);
+        $petugas = $this->userWithRoles(['petugas']);
+
+        // Belum semua OK → ditolak.
+        Livewire::actingAs($petugas)
+            ->test(ManagePemeriksaanBerkas::class)
+            ->set('selectedPermohonan', $permohonan->id)
+            ->call('selesaiPeriksa');
+        $this->assertSame(\App\Enums\PermohonanStatusEnum::PERIKSA_BERKAS_STAF, $permohonan->refresh()->status);
+
+        // Semua OK → maju ke Periksa Berkas (Korsub) + audit log otomatis.
+        Livewire::actingAs($petugas)
+            ->test(ManagePemeriksaanBerkas::class)
+            ->set('selectedPermohonan', $permohonan->id)
+            ->call('setStatus', $berkas->id, 'OK')
+            ->call('selesaiPeriksa');
+
+        $this->assertSame(\App\Enums\PermohonanStatusEnum::PERIKSA_BERKAS_KORSUB, $permohonan->refresh()->status);
+
+        $log = \App\Models\PermohonanAuditLog::where('permohonan_id', $permohonan->id)->latest('id')->first();
+        $this->assertNotNull($log);
+        $this->assertSame(\App\Enums\PermohonanStatusEnum::PERIKSA_BERKAS_KORSUB, $log->status_baru);
+        $this->assertSame($petugas->id, $log->petugas_id);
+        $this->assertStringContainsString('Otomatis', $log->catatan);
+    }
+
+    public function test_selesai_periksa_respects_stage_role_gate(): void
+    {
+        [$permohonan, $berkas] = $this->scenario();
+        $permohonan->update(['status' => \App\Enums\PermohonanStatusEnum::PERIKSA_BERKAS_KORSUB]);
+
+        // Semua berkas OK, tapi tahap Korsub — petugas ditolak, koorsub boleh.
+        \App\Models\PemeriksaanBerkas::create([
+            'permohonan_id' => $permohonan->id, 'berkas_item_id' => $berkas->id,
+            'status' => \App\Enums\PemeriksaanStatusEnum::OK,
+        ]);
+
+        Livewire::actingAs($this->userWithRoles(['petugas']))
+            ->test(ManagePemeriksaanBerkas::class)
+            ->set('selectedPermohonan', $permohonan->id)
+            ->call('selesaiPeriksa');
+        $this->assertSame(\App\Enums\PermohonanStatusEnum::PERIKSA_BERKAS_KORSUB, $permohonan->refresh()->status);
+
+        Livewire::actingAs($this->userWithRoles(['koorsub']))
+            ->test(ManagePemeriksaanBerkas::class)
+            ->set('selectedPermohonan', $permohonan->id)
+            ->call('selesaiPeriksa');
+        $this->assertSame(\App\Enums\PermohonanStatusEnum::PROSES_DAFTAR, $permohonan->refresh()->status);
+    }
+
+    public function test_selesai_periksa_ignored_outside_periksa_stages(): void
+    {
+        [$permohonan, $berkas] = $this->scenario();
+        $permohonan->update(['status' => \App\Enums\PermohonanStatusEnum::TERDAFTAR]);
+
+        \App\Models\PemeriksaanBerkas::create([
+            'permohonan_id' => $permohonan->id, 'berkas_item_id' => $berkas->id,
+            'status' => \App\Enums\PemeriksaanStatusEnum::OK,
+        ]);
+
+        Livewire::actingAs($this->userWithRoles(['petugas', 'koorsub']))
+            ->test(ManagePemeriksaanBerkas::class)
+            ->set('selectedPermohonan', $permohonan->id)
+            ->call('selesaiPeriksa');
+
+        $this->assertSame(\App\Enums\PermohonanStatusEnum::TERDAFTAR, $permohonan->refresh()->status);
+    }
+
+    public function test_query_param_preselects_permohonan(): void
+    {
+        [$permohonan] = $this->scenario();
+
+        // Tautan langsung dari tombol aksi /permohonan.
+        Livewire::withQueryParams(['permohonan' => $permohonan->id])
+            ->test(ManagePemeriksaanBerkas::class)
+            ->assertSet('selectedPermohonan', $permohonan->id)
+            ->assertViewHas('berkasList', fn ($list) => $list->count() === 1);
+
+        // Id tidak dikenal diabaikan.
+        Livewire::withQueryParams(['permohonan' => 'bukan-id'])
+            ->test(ManagePemeriksaanBerkas::class)
+            ->assertSet('selectedPermohonan', '');
+    }
+
     public function test_permohonan_combobox_filters_by_registrasi_and_pemohon(): void
     {
         $budi = \App\Models\Pemohon::create(['nama' => 'Budi Santoso', 'nik' => '7501010101010001']);
