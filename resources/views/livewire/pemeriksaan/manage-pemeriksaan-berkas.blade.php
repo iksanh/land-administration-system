@@ -30,17 +30,64 @@
         <p class="text-sm text-gray-500 mt-1">Periksa kelengkapan berkas per permohonan dan beri catatan.</p>
     </div>
 
-    {{-- Pick permohonan --}}
+    {{-- Pick permohonan (combobox dengan pencarian — daftar penuh tidak pernah dirender) --}}
     <div class="bg-gray-50/50 p-5 rounded-lg border border-gray-200 flex flex-col sm:flex-row sm:items-end gap-4">
         <div class="flex-1">
             <label class="text-sm font-medium text-gray-700 block mb-1.5">Pilih Permohonan</label>
-            <select wire:model.live="selectedPermohonan"
-                class="w-full md:w-2/3 border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]">
-                <option value="">— Pilih permohonan —</option>
-                @foreach ($permohonanList as $p)
-                    <option value="{{ $p->id }}">{{ $p->nomor_registrasi }} — {{ $p->pemohon?->nama ?? 'Tanpa pemohon' }}</option>
-                @endforeach
-            </select>
+
+            @if ($permohonan)
+                {{-- Sudah terpilih: kartu ringkas + tombol ganti --}}
+                <div class="w-full md:w-2/3 flex items-center justify-between gap-3 bg-white border border-[#91caff] rounded-md px-3 py-2">
+                    <div class="min-w-0 flex items-center gap-2 flex-wrap">
+                        <span class="font-mono text-xs text-gray-700">{{ $permohonan->nomor_registrasi }}</span>
+                        <span class="text-sm font-medium text-gray-800 truncate">{{ $permohonan->pemohon?->nama ?? 'Tanpa pemohon' }}</span>
+                        <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold border {{ $permohonan->status->badgeClass() }}">{{ $permohonan->status->label() }}</span>
+                    </div>
+                    <button type="button" wire:click="clearPermohonan"
+                        class="shrink-0 text-xs font-medium text-[#1677ff] hover:text-[#0958d9]">✕ Ganti</button>
+                </div>
+            @else
+                {{-- Belum terpilih: input pencarian + dropdown hasil --}}
+                <div class="relative w-full md:w-2/3" x-data="{ open: false }" x-on:click.outside="open = false">
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">🔍</span>
+                        <input type="text" wire:model.live.debounce.300ms="permohonanSearch"
+                            x-on:focus="open = true" x-on:input="open = true"
+                            x-on:keydown.escape="open = false; $el.blur()"
+                            placeholder="Ketik no. registrasi, nama, atau NIK pemohon..."
+                            class="w-full border border-gray-300 rounded-md pl-9 pr-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]"
+                            autocomplete="off">
+                    </div>
+
+                    <div x-show="open" x-cloak x-transition.opacity.duration.100ms
+                        class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-72 overflow-y-auto divide-y divide-gray-50">
+                        @forelse ($permohonanList as $p)
+                            <button type="button" wire:key="opt-{{ $p->id }}"
+                                wire:click="selectPermohonan('{{ $p->id }}')" x-on:click="open = false"
+                                class="w-full text-left px-3 py-2.5 hover:bg-[#e6f4ff] focus:bg-[#e6f4ff] focus:outline-none flex items-center justify-between gap-3">
+                                <span class="min-w-0">
+                                    <span class="block font-mono text-[11px] text-gray-500">{{ $p->nomor_registrasi }}</span>
+                                    <span class="block text-sm font-medium text-gray-800 truncate">
+                                        {{ $p->pemohon?->nama ?? 'Tanpa pemohon' }}
+                                        @if ($p->pemohon?->nik)<span class="font-normal text-gray-400 text-xs">· {{ $p->pemohon->nik }}</span>@endif
+                                    </span>
+                                </span>
+                                <span class="shrink-0 inline-flex px-2 py-0.5 rounded text-[10px] font-semibold border {{ $p->status->badgeClass() }}">{{ $p->status->label() }}</span>
+                            </button>
+                        @empty
+                            <div class="px-3 py-6 text-center text-sm text-gray-400">
+                                Tidak ada permohonan yang cocok dengan "{{ $permohonanSearch }}".
+                            </div>
+                        @endforelse
+
+                        @if ($permohonanTotal > $permohonanLimit)
+                            <div class="px-3 py-2 text-[11px] text-gray-400 bg-gray-50/70 sticky bottom-0">
+                                Menampilkan {{ $permohonanLimit }} dari {{ $permohonanTotal }} permohonan — persempit dengan mengetik kata kunci.
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            @endif
         </div>
         @if ($selectedPermohonan)
             <button type="button" wire:click="openPrint"

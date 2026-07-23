@@ -25,6 +25,15 @@ class ManagePemeriksaanBerkas extends Component
 {
     public string $selectedPermohonan = '';
 
+    /**
+     * Kata kunci combobox pemilih permohonan (no. registrasi / nama / NIK).
+     * Difilter di server dan dibatasi PERMOHONAN_LIMIT hasil agar dropdown
+     * tetap ringan saat data permohonan sudah banyak.
+     */
+    public string $permohonanSearch = '';
+
+    private const PERMOHONAN_LIMIT = 20;
+
     /** Filter cepat daftar berkas berdasar nama (agar tak perlu menggulir daftar panjang). */
     public string $search = '';
 
@@ -44,6 +53,22 @@ class ManagePemeriksaanBerkas extends Component
     {
         $this->search = '';
         $this->cancelPeriksa();
+    }
+
+    /** Pilih permohonan dari dropdown combobox. */
+    public function selectPermohonan(string $id): void
+    {
+        $this->selectedPermohonan = $id;
+        $this->permohonanSearch = '';
+        $this->updatedSelectedPermohonan();
+    }
+
+    /** Lepas pilihan untuk memilih permohonan lain. */
+    public function clearPermohonan(): void
+    {
+        $this->selectedPermohonan = '';
+        $this->permohonanSearch = '';
+        $this->updatedSelectedPermohonan();
     }
 
     public function openPrint(): void
@@ -155,7 +180,7 @@ class ManagePemeriksaanBerkas extends Component
     public function render()
     {
         $permohonan = $this->selectedPermohonan
-            ? Permohonan::with('layanan')->find($this->selectedPermohonan)
+            ? Permohonan::with(['layanan', 'pemohon'])->find($this->selectedPermohonan)
             : null;
 
         $allBerkas = $permohonan?->layanan_id
@@ -191,8 +216,20 @@ class ManagePemeriksaanBerkas extends Component
             [$printParents, $printChildrenMap] = PemeriksaanSheet::build($permohonan);
         }
 
+        // Combobox: filter di server, batasi hasil; total dipakai untuk hint
+        // "persempit pencarian" bila hasil melebihi batas.
+        $permohonanQuery = Permohonan::with('pemohon')
+            ->when(trim($this->permohonanSearch) !== '', function ($q) {
+                $term = '%'.trim($this->permohonanSearch).'%';
+                $q->where(fn ($w) => $w->where('nomor_registrasi', 'like', $term)
+                    ->orWhereHas('pemohon', fn ($p) => $p->where('nama', 'like', $term)->orWhere('nik', 'like', $term)));
+            })
+            ->latest('created_at');
+
         return view('livewire.pemeriksaan.manage-pemeriksaan-berkas', [
-            'permohonanList' => Permohonan::with('pemohon')->latest('created_at')->get(),
+            'permohonanList' => (clone $permohonanQuery)->limit(self::PERMOHONAN_LIMIT)->get(),
+            'permohonanTotal' => $permohonanQuery->count(),
+            'permohonanLimit' => self::PERMOHONAN_LIMIT,
             'permohonan' => $permohonan,
             'berkasList' => $berkasList,
             'hasBerkas' => $allBerkas->isNotEmpty(),

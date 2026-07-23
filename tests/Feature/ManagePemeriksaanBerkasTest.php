@@ -54,6 +54,49 @@ class ManagePemeriksaanBerkasTest extends TestCase
             ->assertViewHas('hasBerkas', true);
     }
 
+    public function test_permohonan_combobox_filters_by_registrasi_and_pemohon(): void
+    {
+        $budi = \App\Models\Pemohon::create(['nama' => 'Budi Santoso', 'nik' => '7501010101010001']);
+        $siti = \App\Models\Pemohon::create(['nama' => 'Siti Aminah', 'nik' => '7501010101010002']);
+        $a = Permohonan::create(['nomor_registrasi' => 'REG-100', 'pemohon_id' => $budi->id]);
+        $b = Permohonan::create(['nomor_registrasi' => 'REG-200', 'pemohon_id' => $siti->id]);
+
+        Livewire::test(ManagePemeriksaanBerkas::class)
+            ->assertViewHas('permohonanList', fn ($list) => $list->count() === 2)
+            // Cari nama pemohon
+            ->set('permohonanSearch', 'budi')
+            ->assertViewHas('permohonanList', fn ($list) => $list->count() === 1 && $list->first()->id === $a->id)
+            // Cari nomor registrasi
+            ->set('permohonanSearch', 'REG-200')
+            ->assertViewHas('permohonanList', fn ($list) => $list->count() === 1 && $list->first()->id === $b->id)
+            // Cari NIK
+            ->set('permohonanSearch', '0101010002')
+            ->assertViewHas('permohonanList', fn ($list) => $list->count() === 1 && $list->first()->id === $b->id);
+    }
+
+    public function test_select_permohonan_via_combobox_clears_its_search(): void
+    {
+        [$permohonan, $berkas] = $this->scenario();
+
+        Livewire::test(ManagePemeriksaanBerkas::class)
+            ->set('permohonanSearch', 'REG-1')
+            ->call('selectPermohonan', $permohonan->id)
+            ->assertSet('selectedPermohonan', $permohonan->id)
+            ->assertSet('permohonanSearch', '')
+            ->assertViewHas('berkasList', fn ($list) => $list->count() === 1);
+    }
+
+    public function test_clear_permohonan_resets_selection(): void
+    {
+        [$permohonan] = $this->scenario();
+
+        Livewire::test(ManagePemeriksaanBerkas::class)
+            ->call('selectPermohonan', $permohonan->id)
+            ->call('clearPermohonan')
+            ->assertSet('selectedPermohonan', '')
+            ->assertViewHas('permohonan', null);
+    }
+
     public function test_changing_permohonan_clears_search(): void
     {
         [$permohonan, $berkas] = $this->scenario();
