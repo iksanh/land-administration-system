@@ -199,9 +199,12 @@
                         <td class="px-4 py-3 text-center">{{ $p->jenis_kelamin?->value ?? '—' }}</td>
                         <td class="px-4 py-3">{{ $p->desa?->nama ?? '—' }}</td>
                         <td class="px-4 py-3">
-                            <div class="flex items-center justify-center gap-2">
-                                <x-action-btn icon="edit" variant="primary" wire:click="edit('{{ $p->id }}')">Edit</x-action-btn>
-                                <x-action-btn icon="delete" variant="danger" wire:click="delete('{{ $p->id }}')" wire:confirm="Hapus pemohon {{ $p->nama }}?">Hapus</x-action-btn>
+                            <div class="text-center">
+                                <x-action-menu>
+                                    <x-action-menu.item icon="edit" variant="primary" wire:click="edit('{{ $p->id }}')">Edit</x-action-menu.item>
+                                    <x-action-menu.divider />
+                                    <x-action-menu.item icon="delete" variant="danger" wire:click="delete('{{ $p->id }}')" wire:confirm="Hapus pemohon {{ $p->nama }}?">Hapus</x-action-menu.item>
+                                </x-action-menu>
                             </div>
                         </td>
                     </tr>

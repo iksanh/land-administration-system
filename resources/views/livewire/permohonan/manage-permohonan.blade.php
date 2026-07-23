@@ -91,7 +91,7 @@
                     <th class="px-4 py-3">Layanan</th>
                     <th class="px-4 py-3">Tanah</th>
                     <th class="px-4 py-3 text-center">Status</th>
-                    <th class="px-4 py-3 text-center w-44">Aksi</th>
+                    <th class="px-4 py-3 text-center w-16">Aksi</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
@@ -113,22 +113,18 @@
                                 {{ $p->status->label() }}
                             </span>
                         </td>
-                        <td class="px-4 py-3">
-                            <div class="flex items-center justify-center gap-2 flex-wrap">
-                                <x-action-btn icon="status" variant="purple" wire:click="startStatusChange('{{ $p->id }}')">Ubah Status</x-action-btn>
-                                <x-action-btn icon="edit" variant="primary" wire:click="edit('{{ $p->id }}')">Edit</x-action-btn>
-                                <a href="{{ route('berita-acara', ['permohonan' => $p->id]) }}" wire:navigate
-                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border bg-white transition-colors text-[#08979c] border-[#87e8de] hover:bg-[#e6fffb] hover:border-[#08979c]">
-                                    Berita Acara
-                                </a>
-                                <a href="{{ route('risalah', ['permohonan' => $p->id]) }}" wire:navigate
-                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border bg-white transition-colors text-[#531dab] border-[#d3adf7] hover:bg-[#f9f0ff] hover:border-[#531dab]">
-                                    Risalah
-                                </a>
+                        <td class="px-4 py-3 text-center">
+                            <x-action-menu>
+                                <x-action-menu.item icon="status" variant="purple" wire:click="startStatusChange('{{ $p->id }}')">Ubah Status</x-action-menu.item>
+                                <x-action-menu.item icon="edit" variant="primary" wire:click="edit('{{ $p->id }}')">Edit</x-action-menu.item>
+                                <x-action-menu.divider />
+                                <x-action-menu.item icon="doc" variant="cyan" :href="route('berita-acara', ['permohonan' => $p->id])" wire:navigate>Berita Acara</x-action-menu.item>
+                                <x-action-menu.item icon="doc" variant="purple" :href="route('risalah', ['permohonan' => $p->id])" wire:navigate>Risalah</x-action-menu.item>
                                 @if ($p->status->value === 'DRAFT')
-                                    <x-action-btn icon="delete" variant="danger" wire:click="delete('{{ $p->id }}')" wire:confirm="Hapus permohonan {{ $p->nomor_registrasi }}?">Hapus</x-action-btn>
+                                    <x-action-menu.divider />
+                                    <x-action-menu.item icon="delete" variant="danger" wire:click="delete('{{ $p->id }}')" wire:confirm="Hapus permohonan {{ $p->nomor_registrasi }}?">Hapus</x-action-menu.item>
                                 @endif
-                            </div>
+                            </x-action-menu>
                         </td>
                     </tr>
                 @empty

@@ -197,17 +197,15 @@
                         <td class="px-4 py-3 font-semibold text-gray-800">{{ $ba->permohonan?->pemohon?->nama ?? '—' }}</td>
                         <td class="px-4 py-3 whitespace-nowrap">{{ $ba->tgl_pemeriksaan?->locale('id')->translatedFormat('d F Y') ?? '—' }}</td>
                         <td class="px-4 py-3">
-                            <div class="flex items-center justify-center gap-2 flex-wrap">
-                                <x-action-btn icon="edit" variant="primary" wire:click="edit('{{ $ba->id }}')">Edit</x-action-btn>
-                                <button type="button" wire:click="openPrint('{{ $ba->id }}')"
-                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border bg-white transition-colors text-[#722ed1] border-[#d3adf7] hover:bg-[#f9f0ff] hover:border-[#722ed1]">
-                                    🖨️ Cetak
-                                </button>
-                                <a href="{{ route('berita-acara.word', $ba->id) }}"
-                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border bg-white transition-colors text-[#389e0d] border-[#b7eb8f] hover:bg-[#f6ffed] hover:border-[#52c41a]">
-                                    ⬇️ Word
-                                </a>
-                                <x-action-btn icon="delete" variant="danger" wire:click="delete('{{ $ba->id }}')" wire:confirm="Hapus Berita Acara ini?">Hapus</x-action-btn>
+                            <div class="text-center">
+                                <x-action-menu>
+                                    <x-action-menu.item icon="edit" variant="primary" wire:click="edit('{{ $ba->id }}')">Edit</x-action-menu.item>
+                                    <x-action-menu.divider />
+                                    <x-action-menu.item icon="print" variant="purple" wire:click="openPrint('{{ $ba->id }}')">Cetak</x-action-menu.item>
+                                    <x-action-menu.item icon="download" variant="green" :href="route('berita-acara.word', $ba->id)">Unduh Word</x-action-menu.item>
+                                    <x-action-menu.divider />
+                                    <x-action-menu.item icon="delete" variant="danger" wire:click="delete('{{ $ba->id }}')" wire:confirm="Hapus Berita Acara ini?">Hapus</x-action-menu.item>
+                                </x-action-menu>
                             </div>
                         </td>
                     </tr>
