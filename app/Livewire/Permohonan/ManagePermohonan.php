@@ -26,6 +26,13 @@ use Livewire\Component;
 class ManagePermohonan extends Component
 {
     public string $search = '';
+
+    /**
+     * Filter checklist kolom status: kosong = tampilkan semua (default),
+     * berisi nilai enum = hanya status tercentang yang tampil.
+     */
+    public array $statusFilter = [];
+
     public bool $showForm = false;
     public ?string $editingId = null;
 
@@ -38,6 +45,11 @@ class ManagePermohonan extends Component
     // Status-change modal (stepper: maju/mundur satu tahap, tolak, buka kembali)
     public ?string $statusEditingId = null;
     public string $statusCatatan = '';
+
+    // Identitas berkas KKP — wajib diisi saat maju PROSES_DAFTAR → TERDAFTAR.
+    public string $nomor_berkas = '';
+    public string $tahun_berkas = '';
+    public string $tanggal_daftar_kkp = '';
 
     protected function rules(): array
     {
@@ -111,13 +123,20 @@ class ManagePermohonan extends Component
         $p = Permohonan::findOrFail($id);
         $this->statusEditingId = $p->id;
         $this->statusCatatan = '';
-        $this->resetErrorBag('statusCatatan');
+
+        // Prefill data KKP: nilai tersimpan, atau tahun/tanggal hari ini agar
+        // petugas tinggal mengisi nomor berkas.
+        $this->nomor_berkas = $p->nomor_berkas ?? '';
+        $this->tahun_berkas = (string) ($p->tahun_berkas ?? now()->year);
+        $this->tanggal_daftar_kkp = $p->tanggal_daftar_kkp?->format('Y-m-d') ?? now()->format('Y-m-d');
+
+        $this->resetErrorBag();
     }
 
     public function cancelStatusChange(): void
     {
-        $this->reset(['statusEditingId', 'statusCatatan']);
-        $this->resetErrorBag('statusCatatan');
+        $this->reset(['statusEditingId', 'statusCatatan', 'nomor_berkas', 'tahun_berkas', 'tanggal_daftar_kkp']);
+        $this->resetErrorBag();
     }
 
     /** Maju ke tahap berikutnya dalam alur. */
@@ -132,7 +151,31 @@ class ManagePermohonan extends Component
             return;
         }
 
-        $this->applyStatus($p, $next);
+        // Gerbang setelah TERDAFTAR: identitas berkas KKP wajib lengkap
+        // sebelum lanjut ke Konsep RPD & BA & SK.
+        $extra = [];
+        if ($next === PermohonanStatusEnum::KONSEP_RPD_BA_SK_STAF) {
+            $data = $this->validate([
+                'nomor_berkas' => ['required', 'string', 'max:50'],
+                'tahun_berkas' => ['required', 'digits:4', 'integer', 'between:2000,2100'],
+                'tanggal_daftar_kkp' => ['required', 'date'],
+            ], [
+                'nomor_berkas.required' => 'Nomor berkas wajib diisi sebelum lanjut ke Konsep RPD & BA & SK.',
+                'tahun_berkas.required' => 'Tahun berkas wajib diisi sebelum lanjut ke Konsep RPD & BA & SK.',
+                'tahun_berkas.digits' => 'Tahun berkas harus 4 digit (misal '.now()->year.').',
+                'tahun_berkas.between' => 'Tahun berkas harus antara 2000 dan 2100.',
+                'tanggal_daftar_kkp.required' => 'Tanggal daftar KKP wajib diisi sebelum lanjut ke Konsep RPD & BA & SK.',
+                'tanggal_daftar_kkp.date' => 'Tanggal daftar KKP tidak valid.',
+            ]);
+
+            $extra = [
+                'nomor_berkas' => trim($data['nomor_berkas']),
+                'tahun_berkas' => (int) $data['tahun_berkas'],
+                'tanggal_daftar_kkp' => $data['tanggal_daftar_kkp'],
+            ];
+        }
+
+        $this->applyStatus($p, $next, $extra);
         session()->flash('message', "Status maju ke {$next->label()}.");
     }
 
@@ -206,12 +249,12 @@ class ManagePermohonan extends Component
         return true;
     }
 
-    private function applyStatus(Permohonan $p, PermohonanStatusEnum $new): void
+    private function applyStatus(Permohonan $p, PermohonanStatusEnum $new, array $extra = []): void
     {
         $old = $p->status;
 
-        DB::transaction(function () use ($p, $old, $new) {
-            $p->update(['status' => $new]);
+        DB::transaction(function () use ($p, $old, $new, $extra) {
+            $p->update(['status' => $new] + $extra);
 
             PermohonanAuditLog::create([
                 'permohonan_id' => $p->id,
@@ -247,7 +290,9 @@ class ManagePermohonan extends Component
                         ->orWhereHas('pemohon', fn ($p) => $p->where('nama', 'like', $term)->orWhere('nik', 'like', $term))
                         ->orWhereHas('layanan', fn ($l) => $l->where('nama', 'like', $term)));
                 })
+                ->when($this->statusFilter !== [], fn ($q) => $q->whereIn('status', $this->statusFilter))
                 ->latest('created_at')->get(),
+            'statuses' => PermohonanStatusEnum::cases(),
             'pemohonList' => Pemohon::orderBy('nama')->get(),
             'tanahList' => Tanah::with('pemohon')->latest('created_at')->get(),
             'layananList' => MstLayanan::orderBy('nama')->get(),

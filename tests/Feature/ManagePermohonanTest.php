@@ -103,6 +103,72 @@ class ManagePermohonanTest extends TestCase
         $this->assertSame('Diajukan pemohon', $log->catatan);
     }
 
+    public function test_status_filter_limits_list_and_empty_means_all(): void
+    {
+        $draft = Permohonan::create(['nomor_registrasi' => 'REG-30']);
+        $terdaftar = Permohonan::create(['nomor_registrasi' => 'REG-31', 'status' => PermohonanStatusEnum::TERDAFTAR->value]);
+        $ditolak = Permohonan::create(['nomor_registrasi' => 'REG-32', 'status' => PermohonanStatusEnum::DITOLAK->value]);
+
+        Livewire::test(ManagePermohonan::class)
+            // Default (kosong) = semua tampil.
+            ->assertViewHas('permohonanList', fn ($list) => $list->count() === 3)
+            // Satu status dicentang.
+            ->set('statusFilter', [PermohonanStatusEnum::TERDAFTAR->value])
+            ->assertViewHas('permohonanList', fn ($list) => $list->count() === 1 && $list->first()->id === $terdaftar->id)
+            // Dua status dicentang.
+            ->set('statusFilter', [PermohonanStatusEnum::DRAFT->value, PermohonanStatusEnum::DITOLAK->value])
+            ->assertViewHas('permohonanList', fn ($list) => $list->count() === 2)
+            // Reset = semua kembali tampil.
+            ->set('statusFilter', [])
+            ->assertViewHas('permohonanList', fn ($list) => $list->count() === 3);
+    }
+
+    public function test_advance_past_terdaftar_requires_kkp_fields(): void
+    {
+        $p = Permohonan::create(['nomor_registrasi' => 'REG-20', 'status' => PermohonanStatusEnum::TERDAFTAR->value]);
+
+        // Tanpa data KKP → tertahan di Terdaftar.
+        Livewire::test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->set('nomor_berkas', '')
+            ->set('tahun_berkas', '')
+            ->set('tanggal_daftar_kkp', '')
+            ->call('advanceStatus')
+            ->assertHasErrors(['nomor_berkas', 'tahun_berkas', 'tanggal_daftar_kkp']);
+        $this->assertSame(PermohonanStatusEnum::TERDAFTAR, $p->refresh()->status);
+
+        // Lengkap → maju ke Konsep RPD & BA & SK dan data tersimpan.
+        Livewire::test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->set('nomor_berkas', '12345')
+            ->set('tahun_berkas', '2026')
+            ->set('tanggal_daftar_kkp', '2026-07-23')
+            ->call('advanceStatus')
+            ->assertHasNoErrors();
+
+        $p->refresh();
+        $this->assertSame(PermohonanStatusEnum::KONSEP_RPD_BA_SK_STAF, $p->status);
+        $this->assertSame('12345', $p->nomor_berkas);
+        $this->assertSame(2026, $p->tahun_berkas);
+        $this->assertSame('2026-07-23', $p->tanggal_daftar_kkp->format('Y-m-d'));
+    }
+
+    public function test_advance_on_other_steps_does_not_require_kkp_fields(): void
+    {
+        // Termasuk PROSES_DAFTAR → TERDAFTAR: data KKP belum diwajibkan di sini.
+        $p = Permohonan::create(['nomor_registrasi' => 'REG-21', 'status' => PermohonanStatusEnum::PROSES_DAFTAR->value]);
+
+        Livewire::test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->set('nomor_berkas', '')
+            ->set('tahun_berkas', '')
+            ->set('tanggal_daftar_kkp', '')
+            ->call('advanceStatus')
+            ->assertHasNoErrors();
+
+        $this->assertSame(PermohonanStatusEnum::TERDAFTAR, $p->refresh()->status);
+    }
+
     public function test_regress_moves_one_step_back_and_requires_note(): void
     {
         $p = Permohonan::create(['nomor_registrasi' => 'REG-10', 'status' => PermohonanStatusEnum::TERDAFTAR->value]);

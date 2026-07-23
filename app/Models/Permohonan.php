@@ -21,6 +21,9 @@ class Permohonan extends Model
 
     protected $fillable = [
         'nomor_registrasi',
+        'nomor_berkas',
+        'tahun_berkas',
+        'tanggal_daftar_kkp',
         'pemohon_id',
         'tanah_id',
         'layanan_id',
@@ -34,6 +37,8 @@ class Permohonan extends Model
     {
         return [
             'status' => PermohonanStatusEnum::class,
+            'tahun_berkas' => 'integer',
+            'tanggal_daftar_kkp' => 'date',
             'tgl_pendaftaran' => 'date',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
