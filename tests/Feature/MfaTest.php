@@ -21,7 +21,7 @@ class MfaTest extends TestCase
             'name' => 'Petugas Satu',
             'email' => 'petugas@app.com',
             'hashed_password' => Hash::make('rahasia12'),
-            'role' => 'petugas',
+            'roles' => ['petugas'],
             'is_active' => true,
         ], $overrides));
     }

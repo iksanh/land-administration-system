@@ -158,7 +158,7 @@ class ManageRisalahTest extends TestCase
     {
         $user = User::create([
             'name' => 'Petugas', 'email' => 'ris-print@app.com',
-            'hashed_password' => Hash::make('x'), 'role' => 'petugas', 'is_active' => true,
+            'hashed_password' => Hash::make('x'), 'roles' => ['petugas'], 'is_active' => true,
         ]);
         $p = $this->permohonan();
         $r = RisalahPanitiaA::create(['permohonan_id' => $p->id, 'tgl_risalah' => '2025-01-13']);
@@ -174,7 +174,7 @@ class ManageRisalahTest extends TestCase
     {
         $user = User::create([
             'name' => 'Petugas', 'email' => 'ris-kades@app.com',
-            'hashed_password' => Hash::make('x'), 'role' => 'petugas', 'is_active' => true,
+            'hashed_password' => Hash::make('x'), 'roles' => ['petugas'], 'is_active' => true,
         ]);
 
         RefProvinsi::create(['id' => '75', 'nama' => 'GORONTALO']);
@@ -202,7 +202,7 @@ class ManageRisalahTest extends TestCase
     {
         $user = User::create([
             'name' => 'Petugas', 'email' => 'ris-word@app.com',
-            'hashed_password' => Hash::make('x'), 'role' => 'petugas', 'is_active' => true,
+            'hashed_password' => Hash::make('x'), 'roles' => ['petugas'], 'is_active' => true,
         ]);
         $p = $this->permohonan();
         $r = RisalahPanitiaA::create(['permohonan_id' => $p->id, 'tgl_risalah' => '2025-01-13']);

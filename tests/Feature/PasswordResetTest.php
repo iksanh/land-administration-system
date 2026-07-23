@@ -26,7 +26,7 @@ class PasswordResetTest extends TestCase
             'name' => 'Petugas Satu',
             'email' => 'petugas@app.com',
             'hashed_password' => Hash::make('secret123'),
-            'role' => 'petugas',
+            'roles' => ['petugas'],
             'is_active' => true,
         ], $overrides));
     }

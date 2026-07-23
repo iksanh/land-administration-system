@@ -46,7 +46,7 @@ class ModelRoundTripTest extends TestCase
             'name' => 'Petugas Satu',
             'email' => 'petugas@app.com',
             'hashed_password' => 'x', // raw; hashing is exercised in Phase 2
-            'role' => 'petugas',
+            'roles' => ['petugas'],
             'is_active' => true,
         ]);
 

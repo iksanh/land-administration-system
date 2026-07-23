@@ -200,6 +200,9 @@
             $current = $statusPermohonan->status;
             $currentIdx = $current->stepIndex();
             $rejected = $current === \App\Enums\PermohonanStatusEnum::DITOLAK;
+            // Gerbang role per tahap (admin selalu boleh) — cermin dari authorizeStage().
+            $canAct = auth()->user()->isAdmin()
+                || collect($current->allowedRoles())->contains(fn ($r) => auth()->user()->hasRole($r));
         @endphp
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4" wire:key="status-modal-{{ $statusPermohonan->id }}">
             <div class="absolute inset-0 bg-gray-900/45" wire:click="cancelStatusChange"></div>
@@ -226,7 +229,10 @@
                         </div>
                     @else
                         <div class="flex items-center justify-between mb-4">
-                            <span class="text-xs font-medium text-gray-500">Tahap {{ $currentIdx + 1 }} dari {{ count($flow) }}</span>
+                            <span class="text-xs font-medium text-gray-500">
+                                Tahap {{ $currentIdx + 1 }} dari {{ count($flow) }}
+                                <span class="text-gray-400">· diproses oleh {{ $current->allowedRoleLabels() }}</span>
+                            </span>
                             <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold border {{ $current->badgeClass() }}">{{ $current->label() }}</span>
                         </div>
                     @endif
@@ -269,7 +275,7 @@
                 {{-- Actions --}}
                 <div class="px-5 py-4 border-t border-gray-200 bg-gray-50/60 rounded-b-xl flex flex-col gap-2.5">
                     {{-- Gerbang setelah TERDAFTAR: data KKP wajib sebelum ke Konsep RPD & BA & SK --}}
-                    @if (! $rejected && $current === \App\Enums\PermohonanStatusEnum::TERDAFTAR)
+                    @if ($canAct && ! $rejected && $current === \App\Enums\PermohonanStatusEnum::TERDAFTAR)
                         <div class="bg-[#e6f4ff]/60 border border-[#91caff] rounded-md p-3.5 flex flex-col gap-2.5">
                             <div class="flex items-start gap-2">
                                 <span class="shrink-0 mt-0.5 w-4 h-4 inline-flex items-center justify-center rounded-full bg-[#1677ff] text-white text-[10px] font-bold">!</span>
@@ -300,6 +306,23 @@
                         </div>
                     @endif
 
+                    @if (! $canAct)
+                        {{-- User bukan role penanggung jawab tahap ini: hanya lihat. --}}
+                        <div class="flex items-start gap-2.5 bg-gray-50 border border-gray-200 rounded-md px-3.5 py-3">
+                            <span class="shrink-0 mt-0.5">🔒</span>
+                            <p class="text-xs text-gray-500 leading-snug">
+                                Tahap <span class="font-semibold">{{ $current->label() }}</span> diproses oleh role
+                                <span class="font-semibold">{{ $current->allowedRoleLabels() }}</span>.
+                                Anda dapat melihat posisi berkas, namun tidak dapat mengubah statusnya.
+                            </p>
+                        </div>
+                        <div class="flex justify-end">
+                            <button wire:click="cancelStatusChange"
+                                class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50">
+                                Tutup
+                            </button>
+                        </div>
+                    @else
                     <textarea wire:model="statusCatatan" rows="2"
                         placeholder="{{ $rejected ? 'Catatan buka kembali (wajib)...' : 'Catatan — wajib saat mundur atau tolak, opsional saat maju...' }}"
                         class="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]"></textarea>
@@ -336,6 +359,7 @@
                             Tutup
                         </button>
                     </div>
+                    @endif
                 </div>
             </div>
         </div>

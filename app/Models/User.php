@@ -24,7 +24,7 @@ class User extends Authenticatable
         'name',
         'email',
         'hashed_password',
-        'role',
+        'roles',
         'is_active',
     ];
 
@@ -37,6 +37,7 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
+            'roles' => 'array',
             'is_active' => 'boolean',
             'created_at' => 'datetime',
             'mfa_enabled' => 'boolean',
@@ -60,5 +61,24 @@ class User extends Authenticatable
     public function hasMfaEnabled(): bool
     {
         return $this->mfa_enabled && $this->mfa_confirmed_at !== null;
+    }
+
+    /** Satu user bisa memegang beberapa role (kolom `roles`, JSON array). */
+    public function hasRole(string $role): bool
+    {
+        return in_array($role, $this->roles ?? [], true);
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->hasRole(\App\Enums\UserRoleEnum::ADMIN->value);
+    }
+
+    /** Label role untuk tampilan, mis. "Admin, Koorsub". */
+    public function roleLabels(): string
+    {
+        return collect($this->roles ?? [])
+            ->map(fn (string $r) => \App\Enums\UserRoleEnum::tryFrom($r)?->label() ?? $r)
+            ->join(', ');
     }
 }

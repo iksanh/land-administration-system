@@ -17,7 +17,7 @@ class ManageUsersTest extends TestCase
     {
         return User::create([
             'name' => 'Admin', 'email' => 'admin@app.com',
-            'hashed_password' => Hash::make('admin123'), 'role' => 'admin', 'is_active' => true,
+            'hashed_password' => Hash::make('admin123'), 'roles' => ['admin'], 'is_active' => true,
         ]);
     }
 
@@ -25,7 +25,7 @@ class ManageUsersTest extends TestCase
     {
         $petugas = User::create([
             'name' => 'P', 'email' => 'p@app.com',
-            'hashed_password' => Hash::make('x'), 'role' => 'petugas', 'is_active' => true,
+            'hashed_password' => Hash::make('x'), 'roles' => ['petugas'], 'is_active' => true,
         ]);
 
         $this->actingAs($petugas)->get('/users')->assertStatus(403);
@@ -39,14 +39,28 @@ class ManageUsersTest extends TestCase
             ->set('name', 'Budi')
             ->set('email', 'budi@app.com')
             ->set('password', 'rahasia12')
-            ->set('role', 'petugas')
+            ->set('roles', ['petugas', 'koorsub'])
             ->call('create')
             ->assertHasNoErrors();
 
         $user = User::where('email', 'budi@app.com')->first();
         $this->assertNotNull($user);
-        $this->assertSame('petugas', $user->role);
+        $this->assertSame(['petugas', 'koorsub'], $user->roles);
+        $this->assertTrue($user->hasRole('koorsub'));
+        $this->assertFalse($user->isAdmin());
         $this->assertTrue(Hash::check('rahasia12', $user->hashed_password));
+    }
+
+    public function test_create_requires_at_least_one_role(): void
+    {
+        Livewire::actingAs($this->admin())
+            ->test(ManageUsers::class)
+            ->set('name', 'Budi')
+            ->set('email', 'budi2@app.com')
+            ->set('password', 'rahasia12')
+            ->set('roles', [])
+            ->call('create')
+            ->assertHasErrors(['roles']);
     }
 
     public function test_create_rejects_duplicate_email(): void
@@ -54,7 +68,7 @@ class ManageUsersTest extends TestCase
         $this->admin();
 
         Livewire::test(ManageUsers::class)
-            ->set('name', 'X')->set('email', 'admin@app.com')->set('password', 'rahasia12')->set('role', 'admin')
+            ->set('name', 'X')->set('email', 'admin@app.com')->set('password', 'rahasia12')->set('roles', ['admin'])
             ->call('create')
             ->assertHasErrors(['email' => 'unique']);
     }
@@ -71,18 +85,19 @@ class ManageUsersTest extends TestCase
     {
         $u = User::create([
             'name' => 'Lama', 'email' => 'edit@app.com',
-            'hashed_password' => Hash::make('x'), 'role' => 'petugas', 'is_active' => true,
+            'hashed_password' => Hash::make('x'), 'roles' => ['petugas'], 'is_active' => true,
         ]);
 
         Livewire::test(ManageUsers::class)
             ->call('startEdit', $u->id)
-            ->set('editName', 'Baru')->set('editRole', 'admin')->set('editActive', false)
+            ->set('editName', 'Baru')->set('editRoles', ['admin', 'petugas'])->set('editActive', false)
             ->call('update')
             ->assertHasNoErrors();
 
         $u->refresh();
         $this->assertSame('Baru', $u->name);
-        $this->assertSame('admin', $u->role);
+        $this->assertSame(['admin', 'petugas'], $u->roles);
+        $this->assertTrue($u->isAdmin());
         $this->assertFalse($u->is_active);
     }
 
@@ -90,7 +105,7 @@ class ManageUsersTest extends TestCase
     {
         $u = User::create([
             'name' => 'Z', 'email' => 'z@app.com',
-            'hashed_password' => Hash::make('x'), 'role' => 'petugas', 'is_active' => true,
+            'hashed_password' => Hash::make('x'), 'roles' => ['petugas'], 'is_active' => true,
         ]);
 
         Livewire::test(ManageUsers::class)->call('toggleActive', $u->id);

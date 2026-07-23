@@ -158,7 +158,7 @@ class ManageBeritaAcaraTest extends TestCase
     {
         $user = User::create([
             'name' => 'Petugas', 'email' => 'pba@app.com',
-            'hashed_password' => Hash::make('x'), 'role' => 'petugas', 'is_active' => true,
+            'hashed_password' => Hash::make('x'), 'roles' => ['petugas'], 'is_active' => true,
         ]);
         $p = $this->permohonan();
         $ba = BeritaAcaraPemeriksaan::create([
@@ -177,7 +177,7 @@ class ManageBeritaAcaraTest extends TestCase
     {
         $user = User::create([
             'name' => 'Petugas', 'email' => 'pword@app.com',
-            'hashed_password' => Hash::make('x'), 'role' => 'petugas', 'is_active' => true,
+            'hashed_password' => Hash::make('x'), 'roles' => ['petugas'], 'is_active' => true,
         ]);
         $p = $this->permohonan();
         $ba = BeritaAcaraPemeriksaan::create([

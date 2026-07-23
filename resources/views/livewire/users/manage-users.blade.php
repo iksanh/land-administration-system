@@ -36,13 +36,20 @@
                         class="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]">
                     @error('password') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
                 </div>
-                <div class="flex flex-col gap-1.5">
-                    <label class="text-sm font-medium text-gray-700">Role Sistem <span class="text-red-500">*</span></label>
-                    <select wire:model="role"
-                        class="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]">
-                        <option value="petugas">Petugas</option>
-                        <option value="admin">Admin</option>
-                    </select>
+                <div class="flex flex-col gap-1.5 md:col-span-2">
+                    <label class="text-sm font-medium text-gray-700">Role Sistem <span class="text-red-500">*</span> <span class="font-normal text-gray-400">— boleh lebih dari satu</span></label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        @foreach ($roleOptions as $r)
+                            <label class="flex items-start gap-2.5 bg-white border rounded-md px-3 py-2.5 cursor-pointer transition-colors {{ in_array($r->value, $roles, true) ? 'border-[#1677ff] ring-1 ring-[#1677ff]/30' : 'border-gray-300 hover:border-gray-400' }}">
+                                <input type="checkbox" wire:model.live="roles" value="{{ $r->value }}" class="mt-0.5 rounded border-gray-300 text-[#1677ff] focus:ring-[#1677ff]">
+                                <span>
+                                    <span class="block text-sm font-medium text-gray-800">{{ $r->label() }}</span>
+                                    <span class="block text-[11px] text-gray-400 leading-snug">{{ $r->description() }}</span>
+                                </span>
+                            </label>
+                        @endforeach
+                    </div>
+                    @error('roles') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
                 </div>
             </div>
             <div class="flex gap-3 pt-3 border-t border-gray-200">
@@ -93,10 +100,16 @@
                         <td class="px-4 py-3 font-semibold text-gray-800">{{ $user->name }}</td>
                         <td class="px-4 py-3">{{ $user->email }}</td>
                         <td class="px-4 py-3 text-center">
-                            <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold
-                                {{ $user->role === 'admin' ? 'bg-[#f9f0ff] text-[#722ed1] border border-[#d3adf7]' : 'bg-[#e6f4ff] text-[#1677ff] border border-[#91caff]' }}">
-                                {{ strtoupper($user->role) }}
-                            </span>
+                            <div class="inline-flex flex-wrap justify-center gap-1">
+                                @forelse ($user->roles ?? [] as $r)
+                                    @php $enum = \App\Enums\UserRoleEnum::tryFrom($r); @endphp
+                                    <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold border {{ $enum?->badgeClass() ?? 'bg-gray-100 text-gray-600 border-gray-200' }}">
+                                        {{ $enum?->label() ?? $r }}
+                                    </span>
+                                @empty
+                                    <span class="text-xs text-gray-400">—</span>
+                                @endforelse
+                            </div>
                         </td>
                         <td class="px-4 py-3 text-center">
                             @if ($user->hasMfaEnabled())
@@ -143,11 +156,16 @@
                                             @error('editName') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
                                         </div>
                                         <div class="flex flex-col gap-1.5">
-                                            <label class="text-xs font-semibold text-gray-500 uppercase">Role</label>
-                                            <select wire:model="editRole" class="border border-[#ffe58f] rounded-md px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#faad14]">
-                                                <option value="petugas">Petugas</option>
-                                                <option value="admin">Admin</option>
-                                            </select>
+                                            <label class="text-xs font-semibold text-gray-500 uppercase">Role <span class="normal-case font-normal text-gray-400">(boleh lebih dari satu)</span></label>
+                                            <div class="flex flex-col gap-1.5">
+                                                @foreach ($roleOptions as $r)
+                                                    <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                                        <input type="checkbox" wire:model="editRoles" value="{{ $r->value }}" class="rounded border-[#ffe58f] text-[#1677ff] focus:ring-[#faad14]">
+                                                        {{ $r->label() }}
+                                                    </label>
+                                                @endforeach
+                                            </div>
+                                            @error('editRoles') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
                                         </div>
                                         <div class="flex flex-col gap-1.5">
                                             <label class="text-xs font-semibold text-gray-500 uppercase">Status Aktif</label>

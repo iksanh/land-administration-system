@@ -18,6 +18,14 @@ class ManagePermohonanTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function userWithRoles(array $roles): User
+    {
+        return User::create([
+            'name' => 'User '.implode('-', $roles), 'email' => uniqid().'@app.com',
+            'hashed_password' => Hash::make('x'), 'roles' => $roles, 'is_active' => true,
+        ]);
+    }
+
     public function test_can_create_permohonan_defaulting_to_draft(): void
     {
         Livewire::test(ManagePermohonan::class)
@@ -82,7 +90,7 @@ class ManagePermohonanTest extends TestCase
     {
         $user = User::create([
             'name' => 'Petugas', 'email' => 'p@app.com',
-            'hashed_password' => Hash::make('x'), 'role' => 'petugas', 'is_active' => true,
+            'hashed_password' => Hash::make('x'), 'roles' => ['petugas'], 'is_active' => true,
         ]);
         $p = Permohonan::create(['nomor_registrasi' => 'REG-2']);
 
@@ -128,7 +136,8 @@ class ManagePermohonanTest extends TestCase
         $p = Permohonan::create(['nomor_registrasi' => 'REG-20', 'status' => PermohonanStatusEnum::TERDAFTAR->value]);
 
         // Tanpa data KKP → tertahan di Terdaftar.
-        Livewire::test(ManagePermohonan::class)
+        Livewire::actingAs($this->userWithRoles(['petugas']))
+            ->test(ManagePermohonan::class)
             ->call('startStatusChange', $p->id)
             ->set('nomor_berkas', '')
             ->set('tahun_berkas', '')
@@ -138,7 +147,8 @@ class ManagePermohonanTest extends TestCase
         $this->assertSame(PermohonanStatusEnum::TERDAFTAR, $p->refresh()->status);
 
         // Lengkap → maju ke Konsep RPD & BA & SK dan data tersimpan.
-        Livewire::test(ManagePermohonan::class)
+        Livewire::actingAs($this->userWithRoles(['petugas']))
+            ->test(ManagePermohonan::class)
             ->call('startStatusChange', $p->id)
             ->set('nomor_berkas', '12345')
             ->set('tahun_berkas', '2026')
@@ -158,7 +168,8 @@ class ManagePermohonanTest extends TestCase
         // Termasuk PROSES_DAFTAR → TERDAFTAR: data KKP belum diwajibkan di sini.
         $p = Permohonan::create(['nomor_registrasi' => 'REG-21', 'status' => PermohonanStatusEnum::PROSES_DAFTAR->value]);
 
-        Livewire::test(ManagePermohonan::class)
+        Livewire::actingAs($this->userWithRoles(['petugas']))
+            ->test(ManagePermohonan::class)
             ->call('startStatusChange', $p->id)
             ->set('nomor_berkas', '')
             ->set('tahun_berkas', '')
@@ -174,14 +185,16 @@ class ManagePermohonanTest extends TestCase
         $p = Permohonan::create(['nomor_registrasi' => 'REG-10', 'status' => PermohonanStatusEnum::TERDAFTAR->value]);
 
         // Tanpa catatan → ditolak validasi, status tidak berubah.
-        Livewire::test(ManagePermohonan::class)
+        Livewire::actingAs($this->userWithRoles(['petugas']))
+            ->test(ManagePermohonan::class)
             ->call('startStatusChange', $p->id)
             ->call('regressStatus')
             ->assertHasErrors('statusCatatan');
         $this->assertSame(PermohonanStatusEnum::TERDAFTAR, $p->refresh()->status);
 
         // Dengan catatan → mundur tepat satu tahap.
-        Livewire::test(ManagePermohonan::class)
+        Livewire::actingAs($this->userWithRoles(['petugas']))
+            ->test(ManagePermohonan::class)
             ->call('startStatusChange', $p->id)
             ->set('statusCatatan', 'Berkas kurang lengkap')
             ->call('regressStatus')
@@ -193,7 +206,8 @@ class ManagePermohonanTest extends TestCase
     {
         $p = Permohonan::create(['nomor_registrasi' => 'REG-11']);
 
-        Livewire::test(ManagePermohonan::class)
+        Livewire::actingAs($this->userWithRoles(['petugas']))
+            ->test(ManagePermohonan::class)
             ->call('startStatusChange', $p->id)
             ->set('statusCatatan', 'Coba mundur')
             ->call('regressStatus')
@@ -207,22 +221,25 @@ class ManagePermohonanTest extends TestCase
         $p = Permohonan::create(['nomor_registrasi' => 'REG-12', 'status' => PermohonanStatusEnum::TURUN_PANITIA->value]);
 
         // Tolak tanpa catatan → gagal.
-        Livewire::test(ManagePermohonan::class)
+        Livewire::actingAs($this->userWithRoles(['petugas']))
+            ->test(ManagePermohonan::class)
             ->call('startStatusChange', $p->id)
             ->call('rejectStatus')
             ->assertHasErrors('statusCatatan');
         $this->assertSame(PermohonanStatusEnum::TURUN_PANITIA, $p->refresh()->status);
 
         // Tolak dengan catatan → DITOLAK + audit log.
-        Livewire::test(ManagePermohonan::class)
+        Livewire::actingAs($this->userWithRoles(['petugas']))
+            ->test(ManagePermohonan::class)
             ->call('startStatusChange', $p->id)
             ->set('statusCatatan', 'Dokumen tidak sah')
             ->call('rejectStatus')
             ->assertHasNoErrors();
         $this->assertSame(PermohonanStatusEnum::DITOLAK, $p->refresh()->status);
 
-        // Buka kembali → balik ke status sebelum penolakan.
-        Livewire::test(ManagePermohonan::class)
+        // Buka kembali (hanya koorsub/admin) → balik ke status sebelum penolakan.
+        Livewire::actingAs($this->userWithRoles(['koorsub']))
+            ->test(ManagePermohonan::class)
             ->call('startStatusChange', $p->id)
             ->set('statusCatatan', 'Dokumen sudah dilengkapi')
             ->call('reopenStatus')
@@ -230,11 +247,78 @@ class ManagePermohonanTest extends TestCase
         $this->assertSame(PermohonanStatusEnum::TURUN_PANITIA, $p->refresh()->status);
     }
 
+    public function test_stage_role_gate_blocks_wrong_role_and_allows_admin(): void
+    {
+        // Tahap Korsub: petugas ditolak, koorsub boleh, admin selalu boleh.
+        $p = Permohonan::create(['nomor_registrasi' => 'REG-40', 'status' => PermohonanStatusEnum::PERIKSA_BERKAS_KORSUB->value]);
+
+        Livewire::actingAs($this->userWithRoles(['petugas']))
+            ->test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->call('advanceStatus')
+            ->assertHasErrors('statusCatatan');
+        $this->assertSame(PermohonanStatusEnum::PERIKSA_BERKAS_KORSUB, $p->refresh()->status);
+
+        Livewire::actingAs($this->userWithRoles(['koorsub']))
+            ->test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->call('advanceStatus')
+            ->assertHasNoErrors();
+        $this->assertSame(PermohonanStatusEnum::PROSES_DAFTAR, $p->refresh()->status);
+
+        // Tahap staf: koorsub murni ditolak, admin boleh.
+        Livewire::actingAs($this->userWithRoles(['koorsub']))
+            ->test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->call('advanceStatus')
+            ->assertHasErrors('statusCatatan');
+        $this->assertSame(PermohonanStatusEnum::PROSES_DAFTAR, $p->refresh()->status);
+
+        Livewire::actingAs($this->userWithRoles(['admin']))
+            ->test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->call('advanceStatus')
+            ->assertHasNoErrors();
+        $this->assertSame(PermohonanStatusEnum::TERDAFTAR, $p->refresh()->status);
+    }
+
+    public function test_user_with_both_roles_can_process_both_stage_types(): void
+    {
+        $rangkap = $this->userWithRoles(['petugas', 'koorsub']);
+        $p = Permohonan::create(['nomor_registrasi' => 'REG-41', 'status' => PermohonanStatusEnum::PERIKSA_BERKAS_STAF->value]);
+
+        // Tahap staf → maju ke tahap Korsub, lalu tahap Korsub → maju lagi.
+        Livewire::actingAs($rangkap)
+            ->test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->call('advanceStatus')
+            ->assertHasNoErrors()
+            ->call('advanceStatus')
+            ->assertHasNoErrors();
+
+        $this->assertSame(PermohonanStatusEnum::PROSES_DAFTAR, $p->refresh()->status);
+    }
+
+    public function test_petugas_cannot_reopen_rejected_permohonan(): void
+    {
+        $p = Permohonan::create(['nomor_registrasi' => 'REG-42', 'status' => PermohonanStatusEnum::DITOLAK->value]);
+
+        Livewire::actingAs($this->userWithRoles(['petugas']))
+            ->test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->set('statusCatatan', 'Coba buka')
+            ->call('reopenStatus')
+            ->assertHasErrors('statusCatatan');
+
+        $this->assertSame(PermohonanStatusEnum::DITOLAK, $p->refresh()->status);
+    }
+
     public function test_advance_is_blocked_at_final_step(): void
     {
         $p = Permohonan::create(['nomor_registrasi' => 'REG-13', 'status' => PermohonanStatusEnum::LOKET_PENYERAHAN->value]);
 
-        Livewire::test(ManagePermohonan::class)
+        Livewire::actingAs($this->userWithRoles(['petugas']))
+            ->test(ManagePermohonan::class)
             ->call('startStatusChange', $p->id)
             ->call('advanceStatus')
             ->assertHasErrors('statusCatatan');

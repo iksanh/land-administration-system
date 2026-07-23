@@ -26,7 +26,7 @@ class PemeriksaanPrintTest extends TestCase
     {
         return User::create([
             'name' => 'Petugas', 'email' => 'p@app.com',
-            'hashed_password' => Hash::make('x'), 'role' => 'petugas', 'is_active' => true,
+            'hashed_password' => Hash::make('x'), 'roles' => ['petugas'], 'is_active' => true,
         ]);
     }
 

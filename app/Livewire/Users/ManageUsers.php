@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Users;
 
+use App\Enums\UserRoleEnum;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -16,17 +18,17 @@ class ManageUsers extends Component
 {
     public string $search = '';
 
-    // Create form
+    // Create form — satu user bisa memegang beberapa role sekaligus.
     public bool $showForm = false;
     public string $name = '';
     public string $email = '';
     public string $password = '';
-    public string $role = 'petugas';
+    public array $roles = ['petugas'];
 
     // Inline edit
     public ?string $editingId = null;
     public string $editName = '';
-    public string $editRole = 'petugas';
+    public array $editRoles = [];
     public bool $editActive = true;
 
     // Inline reset password
@@ -40,18 +42,22 @@ class ManageUsers extends Component
             'name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:100', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6'],
-            'role' => ['required', 'in:admin,petugas'],
+            'roles' => ['required', 'array', 'min:1'],
+            'roles.*' => [Rule::enum(UserRoleEnum::class)],
+        ], [
+            'roles.required' => 'Pilih minimal satu role.',
+            'roles.min' => 'Pilih minimal satu role.',
         ]);
 
         User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'hashed_password' => Hash::make($data['password']),
-            'role' => $data['role'],
+            'roles' => array_values($data['roles']),
         ]);
 
         $this->reset(['name', 'email', 'password', 'showForm']);
-        $this->role = 'petugas';
+        $this->roles = ['petugas'];
         session()->flash('message', 'User berhasil dibuat.');
     }
 
@@ -61,26 +67,30 @@ class ManageUsers extends Component
         $user = User::findOrFail($id);
         $this->editingId = $user->id;
         $this->editName = $user->name;
-        $this->editRole = $user->role;
+        $this->editRoles = $user->roles ?? [];
         $this->editActive = $user->is_active;
     }
 
     public function cancelEdit(): void
     {
-        $this->reset(['editingId', 'editName', 'editRole', 'editActive']);
+        $this->reset(['editingId', 'editName', 'editRoles', 'editActive']);
     }
 
     public function update(): void
     {
         $data = $this->validate([
             'editName' => ['required', 'string', 'max:100'],
-            'editRole' => ['required', 'in:admin,petugas'],
+            'editRoles' => ['required', 'array', 'min:1'],
+            'editRoles.*' => [Rule::enum(UserRoleEnum::class)],
             'editActive' => ['boolean'],
+        ], [
+            'editRoles.required' => 'Pilih minimal satu role.',
+            'editRoles.min' => 'Pilih minimal satu role.',
         ]);
 
         User::findOrFail($this->editingId)->update([
             'name' => $data['editName'],
-            'role' => $data['editRole'],
+            'roles' => array_values($data['editRoles']),
             'is_active' => $data['editActive'],
         ]);
 
@@ -162,14 +172,15 @@ class ManageUsers extends Component
                     $term = '%'.trim($this->search).'%';
                     $q->where(fn ($w) => $w->where('name', 'like', $term)
                         ->orWhere('email', 'like', $term)
-                        ->orWhere('role', 'like', $term));
+                        ->orWhere('roles', 'like', $term));
                 })
                 ->orderBy('name')->get(),
+            'roleOptions' => UserRoleEnum::cases(),
             // Stats stay over the full set, independent of the search filter.
             'stats' => [
                 'total' => User::count(),
                 'active' => User::where('is_active', true)->count(),
-                'admin' => User::where('role', 'admin')->count(),
+                'admin' => User::whereJsonContains('roles', UserRoleEnum::ADMIN->value)->count(),
             ],
         ]);
     }

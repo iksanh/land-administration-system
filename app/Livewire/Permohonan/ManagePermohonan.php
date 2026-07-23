@@ -139,10 +139,32 @@ class ManagePermohonan extends Component
         $this->resetErrorBag();
     }
 
+    /**
+     * Gerbang role per tahap: hanya role penanggung jawab tahap saat ini
+     * (atau admin) yang boleh memproses. Ditegakkan di server, bukan hanya UI.
+     */
+    private function authorizeStage(Permohonan $p): bool
+    {
+        $user = Auth::user();
+
+        if ($user && ($user->isAdmin() || collect($p->status->allowedRoles())->contains(fn ($r) => $user->hasRole($r)))) {
+            return true;
+        }
+
+        $this->addError('statusCatatan', "Anda tidak berwenang memproses tahap \"{$p->status->label()}\" — tahap ini diproses oleh role {$p->status->allowedRoleLabels()}.");
+
+        return false;
+    }
+
     /** Maju ke tahap berikutnya dalam alur. */
     public function advanceStatus(): void
     {
         $p = Permohonan::findOrFail($this->statusEditingId);
+
+        if (! $this->authorizeStage($p)) {
+            return;
+        }
+
         $next = $p->status->next();
 
         if (! $next) {
@@ -183,6 +205,11 @@ class ManagePermohonan extends Component
     public function regressStatus(): void
     {
         $p = Permohonan::findOrFail($this->statusEditingId);
+
+        if (! $this->authorizeStage($p)) {
+            return;
+        }
+
         $prev = $p->status->prev();
 
         if (! $prev) {
@@ -208,6 +235,10 @@ class ManagePermohonan extends Component
             return;
         }
 
+        if (! $this->authorizeStage($p)) {
+            return;
+        }
+
         if (! $this->requireCatatan('Catatan alasan penolakan wajib diisi.')) {
             return;
         }
@@ -222,6 +253,10 @@ class ManagePermohonan extends Component
         $p = Permohonan::findOrFail($this->statusEditingId);
 
         if ($p->status !== PermohonanStatusEnum::DITOLAK) {
+            return;
+        }
+
+        if (! $this->authorizeStage($p)) {
             return;
         }
 

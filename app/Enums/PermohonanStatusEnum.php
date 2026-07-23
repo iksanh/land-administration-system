@@ -64,6 +64,38 @@ enum PermohonanStatusEnum: string
         return $i === null || $i === 0 ? null : self::flow()[$i - 1];
     }
 
+    /**
+     * Role yang berwenang memproses (maju/mundur/tolak) permohonan yang
+     * sedang berada di tahap ini. Admin selalu boleh (dicek di pemanggil).
+     * Tahap yang menyebut Korsub/Kasi/Kakan dipegang koorsub; tahap
+     * staf/loket/lapangan dipegang petugas. DITOLAK hanya bisa dibuka
+     * kembali oleh koorsub (atau admin).
+     *
+     * @return list<string> nilai UserRoleEnum
+     */
+    public function allowedRoles(): array
+    {
+        return match ($this) {
+            self::PERIKSA_BERKAS_KORSUB,
+            self::PERIKSA_KONSEP_KORSUB,
+            self::TTD_RISALAH,
+            self::KONSEP_SK,
+            self::PERSETUJUAN_KONSEP_SK,
+            self::CETAK_PARAF_SK,
+            self::TTD_SK,
+            self::DITOLAK => [UserRoleEnum::KOORSUB->value],
+            default => [UserRoleEnum::PETUGAS->value],
+        };
+    }
+
+    /** Label role berwenang untuk pesan/tampilan, mis. "Koorsub". */
+    public function allowedRoleLabels(): string
+    {
+        return collect($this->allowedRoles())
+            ->map(fn (string $r) => UserRoleEnum::from($r)->label())
+            ->join(', ');
+    }
+
     /** Nama tahapan yang tampil ke pengguna. */
     public function label(): string
     {

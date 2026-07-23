@@ -20,7 +20,7 @@ class AuthTest extends TestCase
             'name' => 'Petugas Satu',
             'email' => 'petugas@app.com',
             'hashed_password' => Hash::make('secret123'),
-            'role' => 'petugas',
+            'roles' => ['petugas'],
             'is_active' => true,
         ], $overrides));
     }
@@ -107,7 +107,7 @@ class AuthTest extends TestCase
     {
         Route::middleware(['auth', 'role:admin'])->get('/_test/admin-only', fn () => 'ok');
 
-        $petugas = $this->makeUser(['email' => 'p2@app.com', 'role' => 'petugas']);
+        $petugas = $this->makeUser(['email' => 'p2@app.com', 'roles' => ['petugas']]);
 
         $this->actingAs($petugas)->get('/_test/admin-only')->assertStatus(403);
     }
@@ -116,7 +116,7 @@ class AuthTest extends TestCase
     {
         Route::middleware(['auth', 'role:admin'])->get('/_test/admin-only', fn () => 'ok');
 
-        $admin = $this->makeUser(['email' => 'a2@app.com', 'role' => 'admin']);
+        $admin = $this->makeUser(['email' => 'a2@app.com', 'roles' => ['admin']]);
 
         $this->actingAs($admin)->get('/_test/admin-only')->assertOk()->assertSee('ok');
     }
