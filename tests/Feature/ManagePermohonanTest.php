@@ -89,19 +89,91 @@ class ManagePermohonanTest extends TestCase
         Livewire::actingAs($user)
             ->test(ManagePermohonan::class)
             ->call('startStatusChange', $p->id)
-            ->set('newStatus', 'SUBMITTED')
             ->set('statusCatatan', 'Diajukan pemohon')
-            ->call('changeStatus')
+            ->call('advanceStatus')
             ->assertHasNoErrors();
 
-        $this->assertSame(PermohonanStatusEnum::SUBMITTED, $p->refresh()->status);
+        $this->assertSame(PermohonanStatusEnum::PERIKSA_BERKAS_STAF, $p->refresh()->status);
 
         $log = PermohonanAuditLog::where('permohonan_id', $p->id)->first();
         $this->assertNotNull($log);
         $this->assertSame(PermohonanStatusEnum::DRAFT, $log->status_sebelumnya);
-        $this->assertSame(PermohonanStatusEnum::SUBMITTED, $log->status_baru);
+        $this->assertSame(PermohonanStatusEnum::PERIKSA_BERKAS_STAF, $log->status_baru);
         $this->assertSame($user->id, $log->petugas_id);
         $this->assertSame('Diajukan pemohon', $log->catatan);
+    }
+
+    public function test_regress_moves_one_step_back_and_requires_note(): void
+    {
+        $p = Permohonan::create(['nomor_registrasi' => 'REG-10', 'status' => PermohonanStatusEnum::TERDAFTAR->value]);
+
+        // Tanpa catatan → ditolak validasi, status tidak berubah.
+        Livewire::test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->call('regressStatus')
+            ->assertHasErrors('statusCatatan');
+        $this->assertSame(PermohonanStatusEnum::TERDAFTAR, $p->refresh()->status);
+
+        // Dengan catatan → mundur tepat satu tahap.
+        Livewire::test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->set('statusCatatan', 'Berkas kurang lengkap')
+            ->call('regressStatus')
+            ->assertHasNoErrors();
+        $this->assertSame(PermohonanStatusEnum::PROSES_DAFTAR, $p->refresh()->status);
+    }
+
+    public function test_regress_is_blocked_at_first_step(): void
+    {
+        $p = Permohonan::create(['nomor_registrasi' => 'REG-11']);
+
+        Livewire::test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->set('statusCatatan', 'Coba mundur')
+            ->call('regressStatus')
+            ->assertHasErrors('statusCatatan');
+
+        $this->assertSame(PermohonanStatusEnum::DRAFT, $p->refresh()->status);
+    }
+
+    public function test_reject_requires_note_and_reopen_restores_previous_status(): void
+    {
+        $p = Permohonan::create(['nomor_registrasi' => 'REG-12', 'status' => PermohonanStatusEnum::TURUN_PANITIA->value]);
+
+        // Tolak tanpa catatan → gagal.
+        Livewire::test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->call('rejectStatus')
+            ->assertHasErrors('statusCatatan');
+        $this->assertSame(PermohonanStatusEnum::TURUN_PANITIA, $p->refresh()->status);
+
+        // Tolak dengan catatan → DITOLAK + audit log.
+        Livewire::test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->set('statusCatatan', 'Dokumen tidak sah')
+            ->call('rejectStatus')
+            ->assertHasNoErrors();
+        $this->assertSame(PermohonanStatusEnum::DITOLAK, $p->refresh()->status);
+
+        // Buka kembali → balik ke status sebelum penolakan.
+        Livewire::test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->set('statusCatatan', 'Dokumen sudah dilengkapi')
+            ->call('reopenStatus')
+            ->assertHasNoErrors();
+        $this->assertSame(PermohonanStatusEnum::TURUN_PANITIA, $p->refresh()->status);
+    }
+
+    public function test_advance_is_blocked_at_final_step(): void
+    {
+        $p = Permohonan::create(['nomor_registrasi' => 'REG-13', 'status' => PermohonanStatusEnum::LOKET_PENYERAHAN->value]);
+
+        Livewire::test(ManagePermohonan::class)
+            ->call('startStatusChange', $p->id)
+            ->call('advanceStatus')
+            ->assertHasErrors('statusCatatan');
+
+        $this->assertSame(PermohonanStatusEnum::LOKET_PENYERAHAN, $p->refresh()->status);
     }
 
     public function test_draft_permohonan_can_be_deleted(): void
@@ -115,7 +187,7 @@ class ManagePermohonanTest extends TestCase
 
     public function test_non_draft_permohonan_cannot_be_deleted(): void
     {
-        $p = Permohonan::create(['nomor_registrasi' => 'REG-4', 'status' => PermohonanStatusEnum::SUBMITTED->value]);
+        $p = Permohonan::create(['nomor_registrasi' => 'REG-4', 'status' => PermohonanStatusEnum::TERDAFTAR->value]);
 
         Livewire::test(ManagePermohonan::class)
             ->call('delete', $p->id)

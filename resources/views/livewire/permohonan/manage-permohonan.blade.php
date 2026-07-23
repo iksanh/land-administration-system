@@ -1,18 +1,4 @@
 <div class="flex flex-col gap-6">
-    @php
-        $statusColor = fn ($s) => match ($s) {
-            'DRAFT' => 'bg-gray-100 text-gray-600 border-gray-200',
-            'SUBMITTED' => 'bg-[#e6f4ff] text-[#1677ff] border-[#91caff]',
-            'VERIFIKASI_BERKAS' => 'bg-[#fff7e6] text-[#d46b08] border-[#ffd591]',
-            'PENGUKURAN' => 'bg-[#f9f0ff] text-[#722ed1] border-[#d3adf7]',
-            'PANITIA' => 'bg-[#e6fffb] text-[#08979c] border-[#87e8de]',
-            'SK_TERBIT' => 'bg-[#f6ffed] text-[#389e0d] border-[#b7eb8f]',
-            'SELESAI' => 'bg-[#52c41a]/10 text-[#389e0d] border-[#b7eb8f]',
-            'DITOLAK' => 'bg-[#fff1f0] text-[#cf1322] border-[#ffa39e]',
-            default => 'bg-gray-100 text-gray-600 border-gray-200',
-        };
-    @endphp
-
     <x-flash />
 
     {{-- Header --}}
@@ -123,8 +109,8 @@
                             @endif
                         </td>
                         <td class="px-4 py-3 text-center">
-                            <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold border {{ $statusColor($p->status->value) }}">
-                                {{ $p->status->value }}
+                            <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold border {{ $p->status->badgeClass() }}">
+                                {{ $p->status->label() }}
                             </span>
                         </td>
                         <td class="px-4 py-3">
@@ -143,24 +129,6 @@
                                     <x-action-btn icon="delete" variant="danger" wire:click="delete('{{ $p->id }}')" wire:confirm="Hapus permohonan {{ $p->nomor_registrasi }}?">Hapus</x-action-btn>
                                 @endif
                             </div>
-
-                            {{-- Status-change panel --}}
-                            @if ($statusEditingId === $p->id)
-                                <div class="mt-3 bg-[#f9f0ff] border border-[#d3adf7] rounded-md p-3 flex flex-col gap-2 text-left">
-                                    <label class="text-[11px] font-semibold text-[#531dab] uppercase">Ubah Status</label>
-                                    <select wire:model="newStatus" class="border border-[#d3adf7] rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#722ed1]">
-                                        @foreach ($statuses as $s)
-                                            <option value="{{ $s->value }}">{{ $s->value }}</option>
-                                        @endforeach
-                                    </select>
-                                    @error('newStatus') <span class="text-[10px] text-red-500">{{ $message }}</span> @enderror
-                                    <textarea wire:model="statusCatatan" rows="2" placeholder="Catatan (opsional)" class="border border-[#d3adf7] rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#722ed1]"></textarea>
-                                    <div class="flex gap-2">
-                                        <button wire:click="changeStatus" class="bg-[#722ed1] hover:bg-[#531dab] text-white rounded px-3 py-1.5 text-xs font-medium">Simpan</button>
-                                        <button wire:click="cancelStatusChange" class="bg-white border border-gray-300 text-gray-600 rounded px-3 py-1.5 text-xs">Batal</button>
-                                    </div>
-                                </div>
-                            @endif
                         </td>
                     </tr>
                 @empty
@@ -169,4 +137,114 @@
             </tbody>
         </table>
     </div>
+
+    {{-- Status stepper modal --}}
+    @if ($statusEditingId && $statusPermohonan)
+        @php
+            $flow = \App\Enums\PermohonanStatusEnum::flow();
+            $current = $statusPermohonan->status;
+            $currentIdx = $current->stepIndex();
+            $rejected = $current === \App\Enums\PermohonanStatusEnum::DITOLAK;
+        @endphp
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4" wire:key="status-modal-{{ $statusPermohonan->id }}">
+            <div class="absolute inset-0 bg-gray-900/45" wire:click="cancelStatusChange"></div>
+            <div class="relative bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-lg max-h-[90vh] flex flex-col">
+
+                {{-- Modal header --}}
+                <div class="flex items-start justify-between px-5 py-4 border-b border-gray-200">
+                    <div class="min-w-0">
+                        <h3 class="text-base font-semibold text-gray-800">Ubah Status Permohonan</h3>
+                        <p class="text-xs text-gray-500 mt-0.5 truncate">
+                            <span class="font-mono">{{ $statusPermohonan->nomor_registrasi }}</span>
+                            — {{ $statusPermohonan->pemohon?->nama ?? 'Tanpa pemohon' }}
+                        </p>
+                    </div>
+                    <button wire:click="cancelStatusChange" class="ml-3 shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100">✕</button>
+                </div>
+
+                {{-- Stepper --}}
+                <div class="px-5 py-4 overflow-y-auto flex-1">
+                    @if ($rejected)
+                        <div class="mb-4 bg-[#fff1f0] border border-[#ffa39e] rounded-md px-3 py-2.5 text-sm text-[#cf1322]">
+                            Permohonan ini berstatus <span class="font-semibold">Ditolak</span>. Isi catatan lalu klik
+                            <span class="font-semibold">Buka Kembali</span> untuk mengembalikannya ke tahap sebelum penolakan.
+                        </div>
+                    @else
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-xs font-medium text-gray-500">Tahap {{ $currentIdx + 1 }} dari {{ count($flow) }}</span>
+                            <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold border {{ $current->badgeClass() }}">{{ $current->label() }}</span>
+                        </div>
+                    @endif
+
+                    <ol>
+                        @foreach ($flow as $i => $step)
+                            @php
+                                $done = ! $rejected && $i < $currentIdx;
+                                $active = ! $rejected && $i === $currentIdx;
+                            @endphp
+                            <li class="flex gap-3">
+                                <div class="flex flex-col items-center">
+                                    <span class="w-6 h-6 shrink-0 rounded-full inline-flex items-center justify-center text-[11px] font-semibold border
+                                        {{ $done ? 'bg-[#1677ff] border-[#1677ff] text-white' : '' }}
+                                        {{ $active ? 'bg-white border-[#1677ff] text-[#1677ff] ring-4 ring-[#1677ff]/15' : '' }}
+                                        {{ ! $done && ! $active ? 'bg-white border-gray-300 text-gray-400' : '' }}">
+                                        {{ $done ? '✓' : $i + 1 }}
+                                    </span>
+                                    @unless ($loop->last)
+                                        <span class="w-px flex-1 min-h-4 {{ $done ? 'bg-[#1677ff]' : 'bg-gray-200' }}"></span>
+                                    @endunless
+                                </div>
+                                <div class="pb-4 pt-1 min-w-0">
+                                    <p class="text-[13px] leading-snug {{ $active ? 'font-semibold text-[#1677ff]' : ($done ? 'text-gray-700' : 'text-gray-400') }}">
+                                        {{ $step->label() }}
+                                        @if ($active) <span class="ml-1 text-[10px] font-semibold uppercase tracking-wide text-[#1677ff]/70">— saat ini</span> @endif
+                                    </p>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ol>
+                </div>
+
+                {{-- Actions --}}
+                <div class="px-5 py-4 border-t border-gray-200 bg-gray-50/60 rounded-b-xl flex flex-col gap-2.5">
+                    <textarea wire:model="statusCatatan" rows="2"
+                        placeholder="{{ $rejected ? 'Catatan buka kembali (wajib)...' : 'Catatan — wajib saat mundur atau tolak, opsional saat maju...' }}"
+                        class="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]"></textarea>
+                    @error('statusCatatan') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if ($rejected)
+                            <button wire:click="reopenStatus"
+                                class="px-4 py-2 rounded-md text-sm font-medium bg-[#1677ff] hover:bg-[#0958d9] text-white shadow-sm">
+                                Buka Kembali
+                            </button>
+                        @else
+                            @if ($current->next())
+                                <button wire:click="advanceStatus" wire:loading.attr="disabled"
+                                    class="px-4 py-2 rounded-md text-sm font-medium bg-[#1677ff] hover:bg-[#0958d9] text-white shadow-sm">
+                                    Lanjut: {{ $current->next()->label() }} →
+                                </button>
+                            @else
+                                <span class="text-sm font-medium text-[#389e0d]">✓ Alur selesai — berkas di Loket Penyerahan.</span>
+                            @endif
+                            @if ($current->prev())
+                                <button wire:click="regressStatus" wire:loading.attr="disabled"
+                                    class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50">
+                                    ← Mundur
+                                </button>
+                            @endif
+                            <button wire:click="rejectStatus" wire:loading.attr="disabled"
+                                class="ml-auto px-3 py-2 rounded-md text-sm font-medium text-[#cf1322] bg-white border border-[#ffa39e] hover:bg-[#fff1f0]">
+                                Tolak
+                            </button>
+                        @endif
+                        <button wire:click="cancelStatusChange"
+                            class="px-3 py-2 rounded-md text-sm font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 {{ $rejected ? 'ml-auto' : '' }}">
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

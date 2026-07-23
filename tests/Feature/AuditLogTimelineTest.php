@@ -22,12 +22,12 @@ class AuditLogTimelineTest extends TestCase
         $first = PermohonanAuditLog::create([
             'permohonan_id' => $a->id,
             'status_sebelumnya' => PermohonanStatusEnum::DRAFT,
-            'status_baru' => PermohonanStatusEnum::SUBMITTED,
+            'status_baru' => PermohonanStatusEnum::PERIKSA_BERKAS_STAF,
         ]);
         $second = PermohonanAuditLog::create([
             'permohonan_id' => $a->id,
-            'status_sebelumnya' => PermohonanStatusEnum::SUBMITTED,
-            'status_baru' => PermohonanStatusEnum::VERIFIKASI_BERKAS,
+            'status_sebelumnya' => PermohonanStatusEnum::PERIKSA_BERKAS_STAF,
+            'status_baru' => PermohonanStatusEnum::PERIKSA_BERKAS_KORSUB,
         ]);
         PermohonanAuditLog::create([
             'permohonan_id' => $b->id,
@@ -38,7 +38,7 @@ class AuditLogTimelineTest extends TestCase
         Livewire::test(AuditLogTimeline::class)
             ->set('selectedPermohonan', $a->id)
             ->assertViewHas('logs', fn ($logs) => $logs->count() === 2 && $logs->first()->id === $second->id)
-            ->assertDontSee('DITOLAK');
+            ->assertDontSee('Ditolak');
     }
 
     public function test_no_permohonan_selected_shows_empty(): void

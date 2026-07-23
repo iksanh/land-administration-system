@@ -28,10 +28,10 @@
                             <span class="absolute -left-2.5 flex items-center justify-center w-5 h-5 bg-[#1677ff] rounded-full ring-4 ring-white"></span>
                             <div class="flex items-center gap-2 flex-wrap">
                                 @if ($log->status_sebelumnya)
-                                    <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-100 text-gray-600 border border-gray-200">{{ $log->status_sebelumnya->value }}</span>
+                                    <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold border {{ $log->status_sebelumnya->badgeClass() }}">{{ $log->status_sebelumnya->label() }}</span>
                                     <span class="text-gray-400">→</span>
                                 @endif
-                                <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold bg-[#e6f4ff] text-[#1677ff] border border-[#91caff]">{{ $log->status_baru->value }}</span>
+                                <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold border {{ $log->status_baru->badgeClass() }}">{{ $log->status_baru->label() }}</span>
                                 <span class="text-xs text-gray-400 ml-1">{{ $log->created_at?->format('d M Y H:i') }}</span>
                             </div>
                             <p class="text-xs text-gray-500 mt-1">

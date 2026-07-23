@@ -66,7 +66,7 @@
                         @php $count = $byStatus[$s->value] ?? 0; $pct = $totalPermohonan ? round($count / $totalPermohonan * 100) : 0; @endphp
                         <div>
                             <div class="flex justify-between text-xs mb-1">
-                                <span class="text-gray-600">{{ $s->value }}</span>
+                                <span class="text-gray-600">{{ $s->label() }}</span>
                                 <span class="text-gray-400 font-medium">{{ $count }}</span>
                             </div>
                             <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">

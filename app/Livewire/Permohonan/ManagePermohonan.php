@@ -35,9 +35,8 @@ class ManagePermohonan extends Component
     public string $layanan_id = '';
     public string $tgl_pendaftaran = '';
 
-    // Status-change panel
+    // Status-change modal (stepper: maju/mundur satu tahap, tolak, buka kembali)
     public ?string $statusEditingId = null;
-    public string $newStatus = '';
     public string $statusCatatan = '';
 
     protected function rules(): array
@@ -111,31 +110,105 @@ class ManagePermohonan extends Component
     {
         $p = Permohonan::findOrFail($id);
         $this->statusEditingId = $p->id;
-        $this->newStatus = $p->status->value;
         $this->statusCatatan = '';
+        $this->resetErrorBag('statusCatatan');
     }
 
     public function cancelStatusChange(): void
     {
-        $this->reset(['statusEditingId', 'newStatus', 'statusCatatan']);
+        $this->reset(['statusEditingId', 'statusCatatan']);
+        $this->resetErrorBag('statusCatatan');
     }
 
-    public function changeStatus(): void
+    /** Maju ke tahap berikutnya dalam alur. */
+    public function advanceStatus(): void
     {
-        $this->validate([
-            'newStatus' => ['required', Rule::enum(PermohonanStatusEnum::class)],
-            'statusCatatan' => ['nullable', 'string'],
-        ]);
-
         $p = Permohonan::findOrFail($this->statusEditingId);
-        $old = $p->status;
-        $new = PermohonanStatusEnum::from($this->newStatus);
+        $next = $p->status->next();
 
-        if ($old === $new) {
-            session()->flash('error', 'Status tidak berubah.');
+        if (! $next) {
+            $this->addError('statusCatatan', 'Permohonan sudah berada di tahap akhir.');
 
             return;
         }
+
+        $this->applyStatus($p, $next);
+        session()->flash('message', "Status maju ke {$next->label()}.");
+    }
+
+    /** Mundur satu tahap untuk koreksi — wajib catatan alasan. */
+    public function regressStatus(): void
+    {
+        $p = Permohonan::findOrFail($this->statusEditingId);
+        $prev = $p->status->prev();
+
+        if (! $prev) {
+            $this->addError('statusCatatan', 'Status sudah di tahap awal dan tidak bisa dimundurkan.');
+
+            return;
+        }
+
+        if (! $this->requireCatatan('Catatan alasan wajib diisi saat memundurkan status.')) {
+            return;
+        }
+
+        $this->applyStatus($p, $prev);
+        session()->flash('message', "Status dikembalikan ke {$prev->label()}.");
+    }
+
+    /** Tolak permohonan dari tahap mana pun — wajib catatan alasan. */
+    public function rejectStatus(): void
+    {
+        $p = Permohonan::findOrFail($this->statusEditingId);
+
+        if ($p->status === PermohonanStatusEnum::DITOLAK) {
+            return;
+        }
+
+        if (! $this->requireCatatan('Catatan alasan penolakan wajib diisi.')) {
+            return;
+        }
+
+        $this->applyStatus($p, PermohonanStatusEnum::DITOLAK);
+        session()->flash('message', 'Permohonan ditolak.');
+    }
+
+    /** Buka kembali permohonan DITOLAK ke tahap sebelum penolakan — wajib catatan. */
+    public function reopenStatus(): void
+    {
+        $p = Permohonan::findOrFail($this->statusEditingId);
+
+        if ($p->status !== PermohonanStatusEnum::DITOLAK) {
+            return;
+        }
+
+        if (! $this->requireCatatan('Catatan wajib diisi saat membuka kembali permohonan.')) {
+            return;
+        }
+
+        $restore = PermohonanAuditLog::where('permohonan_id', $p->id)
+            ->where('status_baru', PermohonanStatusEnum::DITOLAK->value)
+            ->latest('id')->first()
+            ?->status_sebelumnya ?? PermohonanStatusEnum::DRAFT;
+
+        $this->applyStatus($p, $restore);
+        session()->flash('message', "Permohonan dibuka kembali ke {$restore->label()}.");
+    }
+
+    private function requireCatatan(string $message): bool
+    {
+        if (trim($this->statusCatatan) === '') {
+            $this->addError('statusCatatan', $message);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function applyStatus(Permohonan $p, PermohonanStatusEnum $new): void
+    {
+        $old = $p->status;
 
         DB::transaction(function () use ($p, $old, $new) {
             $p->update(['status' => $new]);
@@ -145,12 +218,14 @@ class ManagePermohonan extends Component
                 'status_sebelumnya' => $old,
                 'status_baru' => $new,
                 'petugas_id' => Auth::id(),
-                'catatan' => $this->statusCatatan !== '' ? $this->statusCatatan : null,
+                'catatan' => trim($this->statusCatatan) !== '' ? trim($this->statusCatatan) : null,
             ]);
         });
 
-        $this->cancelStatusChange();
-        session()->flash('message', "Status diubah ke {$new->value}.");
+        // Modal tetap terbuka agar petugas melihat posisi tahap terbaru
+        // dan bisa lanjut beberapa tahap tanpa membuka ulang.
+        $this->statusCatatan = '';
+        $this->resetErrorBag('statusCatatan');
     }
 
     public function resetForm(): void
@@ -176,7 +251,9 @@ class ManagePermohonan extends Component
             'pemohonList' => Pemohon::orderBy('nama')->get(),
             'tanahList' => Tanah::with('pemohon')->latest('created_at')->get(),
             'layananList' => MstLayanan::orderBy('nama')->get(),
-            'statuses' => PermohonanStatusEnum::cases(),
+            'statusPermohonan' => $this->statusEditingId
+                ? Permohonan::with('pemohon')->find($this->statusEditingId)
+                : null,
             // Tanah already tied to another permohonan — disabled in the picker.
             'usedTanahIds' => Permohonan::whereNotNull('tanah_id')
                 ->when($this->editingId, fn ($q) => $q->where('id', '!=', $this->editingId))

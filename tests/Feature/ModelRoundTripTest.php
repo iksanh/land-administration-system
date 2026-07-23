@@ -155,14 +155,14 @@ class ModelRoundTripTest extends TestCase
         $log = PermohonanAuditLog::create([
             'permohonan_id' => $permohonan->id,
             'status_sebelumnya' => PermohonanStatusEnum::DRAFT,
-            'status_baru' => PermohonanStatusEnum::SUBMITTED,
+            'status_baru' => PermohonanStatusEnum::PERIKSA_BERKAS_STAF,
             'catatan' => 'Diajukan pemohon',
         ]);
 
         $fresh = $log->fresh();
         $this->assertIsInt($fresh->id);
         $this->assertSame(PermohonanStatusEnum::DRAFT, $fresh->status_sebelumnya);
-        $this->assertSame(PermohonanStatusEnum::SUBMITTED, $fresh->status_baru);
+        $this->assertSame(PermohonanStatusEnum::PERIKSA_BERKAS_STAF, $fresh->status_baru);
         $this->assertSame('REG-0003', $fresh->permohonan->nomor_registrasi);
     }
 }
