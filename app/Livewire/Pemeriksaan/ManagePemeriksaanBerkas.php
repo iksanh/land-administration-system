@@ -95,9 +95,10 @@ class ManagePemeriksaanBerkas extends Component
     ];
 
     /**
-     * Selesai memeriksa: bila seluruh berkas pada checklist berstatus OK,
-     * permohonan maju satu tahap (Staf → Korsub, atau Korsub → Proses Daftar)
-     * dan tercatat di audit log. Gerbang role tahap tetap berlaku.
+     * Kirim manual ke tahap berikutnya (Staf → Korsub, atau Korsub → Proses
+     * Daftar). Tidak mensyaratkan semua berkas OK — keputusan ada di petugas;
+     * ringkasan hasil pemeriksaan direkam di catatan audit log. Hanya gerbang
+     * role tahap yang ditegakkan.
      */
     public function selesaiPeriksa(): void
     {
@@ -115,28 +116,27 @@ class ManagePemeriksaanBerkas extends Component
         }
 
         $stat = $this->periksaStat($p);
-        if ($stat['total'] === 0 || $stat['ok'] < $stat['total']) {
-            session()->flash('error', 'Seluruh berkas harus berstatus OK sebelum lanjut ke tahap berikutnya.');
-
-            return;
-        }
-
         $next = $p->status->next();
         $old = $p->status;
 
         DB::transaction(function () use ($p, $old, $next, $stat) {
             $p->update(['status' => $next]);
 
+            $belum = $stat['total'] - $stat['checked'];
+            $bermasalah = $stat['checked'] - $stat['ok'];
+
             PermohonanAuditLog::create([
                 'permohonan_id' => $p->id,
                 'status_sebelumnya' => $old,
                 'status_baru' => $next,
                 'petugas_id' => Auth::id(),
-                'catatan' => "Otomatis: seluruh {$stat['total']} berkas OK — {$old->label()} selesai.",
+                'catatan' => "{$old->label()} selesai — {$stat['ok']}/{$stat['total']} OK"
+                    .($bermasalah > 0 ? ", {$bermasalah} revisi/tolak" : '')
+                    .($belum > 0 ? ", {$belum} belum diperiksa" : '').'.',
             ]);
         });
 
-        session()->flash('message', "Pemeriksaan selesai — status maju ke {$next->label()}.");
+        session()->flash('message', "Status maju ke {$next->label()}.");
     }
 
     /** Hitung progres pemeriksaan untuk checklist permohonan ini. */

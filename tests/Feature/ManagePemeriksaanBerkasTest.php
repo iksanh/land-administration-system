@@ -63,24 +63,16 @@ class ManagePemeriksaanBerkasTest extends TestCase
         ]);
     }
 
-    public function test_selesai_periksa_advances_stage_when_all_berkas_ok(): void
+    public function test_kirim_periksa_advances_stage_without_requiring_all_ok(): void
     {
         [$permohonan, $berkas] = $this->scenario();
         $permohonan->update(['status' => \App\Enums\PermohonanStatusEnum::PERIKSA_BERKAS_STAF]);
         $petugas = $this->userWithRoles(['petugas']);
 
-        // Belum semua OK → ditolak.
+        // Kirim manual walau belum semua OK — ringkasan terekam di audit log.
         Livewire::actingAs($petugas)
             ->test(ManagePemeriksaanBerkas::class)
             ->set('selectedPermohonan', $permohonan->id)
-            ->call('selesaiPeriksa');
-        $this->assertSame(\App\Enums\PermohonanStatusEnum::PERIKSA_BERKAS_STAF, $permohonan->refresh()->status);
-
-        // Semua OK → maju ke Periksa Berkas (Korsub) + audit log otomatis.
-        Livewire::actingAs($petugas)
-            ->test(ManagePemeriksaanBerkas::class)
-            ->set('selectedPermohonan', $permohonan->id)
-            ->call('setStatus', $berkas->id, 'OK')
             ->call('selesaiPeriksa');
 
         $this->assertSame(\App\Enums\PermohonanStatusEnum::PERIKSA_BERKAS_KORSUB, $permohonan->refresh()->status);
@@ -89,7 +81,8 @@ class ManagePemeriksaanBerkasTest extends TestCase
         $this->assertNotNull($log);
         $this->assertSame(\App\Enums\PermohonanStatusEnum::PERIKSA_BERKAS_KORSUB, $log->status_baru);
         $this->assertSame($petugas->id, $log->petugas_id);
-        $this->assertStringContainsString('Otomatis', $log->catatan);
+        $this->assertStringContainsString('0/1 OK', $log->catatan);
+        $this->assertStringContainsString('belum diperiksa', $log->catatan);
     }
 
     public function test_selesai_periksa_respects_stage_role_gate(): void

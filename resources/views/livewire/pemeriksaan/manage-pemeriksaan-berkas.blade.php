@@ -125,14 +125,17 @@
                 <div class="shrink-0">
                     @if (! $canSelesai)
                         <p class="text-xs text-gray-400 max-w-52">🔒 Tahap ini diselesaikan oleh role {{ $permohonan->status->allowedRoleLabels() }}.</p>
-                    @elseif ($allOk && $next)
+                    @elseif ($next)
                         <button type="button" wire:click="selesaiPeriksa"
-                            wire:confirm="Selesaikan pemeriksaan dan majukan status ke {{ $next->label() }}?"
-                            class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-[#389e0d] hover:bg-[#237804] text-white shadow-sm">
-                            ✓ Selesai — Lanjut ke {{ $next->label() }}
+                            wire:confirm="{{ $allOk
+                                ? "Kirim permohonan ke tahap {$next->label()}?"
+                                : "Belum semua berkas OK ({$periksaStat['ok']}/{$periksaStat['total']}). Tetap kirim ke tahap {$next->label()}?" }}"
+                            class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-white shadow-sm {{ $allOk ? 'bg-[#389e0d] hover:bg-[#237804]' : 'bg-[#1677ff] hover:bg-[#0958d9]' }}">
+                            {{ $allOk ? '✓' : '→' }} Kirim ke {{ $next->label() }}
                         </button>
-                    @else
-                        <p class="text-xs text-gray-400 max-w-52">Seluruh berkas harus <span class="font-semibold text-[#389e0d]">OK</span> untuk lanjut ke tahap berikutnya.</p>
+                        @unless ($allOk)
+                            <p class="text-[11px] text-gray-400 mt-1.5 max-w-56">Belum semua berkas OK — hasil pemeriksaan tetap terekam di catatan riwayat.</p>
+                        @endunless
                     @endif
                 </div>
             </div>
