@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Livewire\Risalah\ManageRisalah;
-use App\Models\PanitiaPemeriksa;
 use App\Models\Pemohon;
 use App\Models\Permohonan;
 use App\Models\RefDesa;
@@ -13,6 +12,7 @@ use App\Models\RefKepalaDesa;
 use App\Models\RefProvinsi;
 use App\Models\RisalahPanitiaA;
 use App\Models\RiwayatPenguasaan;
+use App\Models\SkPanitia;
 use App\Models\Tanah;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -39,14 +39,19 @@ class ManageRisalahTest extends TestCase
     public function test_create_for_prefills_defaults_and_active_panitia(): void
     {
         $p = $this->permohonan();
-        $ketua = PanitiaPemeriksa::create(['nama' => 'Ketua', 'peran' => 'KETUA', 'urutan' => 1, 'is_active' => true]);
-        PanitiaPemeriksa::create(['nama' => 'Nonaktif', 'peran' => 'ANGGOTA', 'urutan' => 3, 'is_active' => false]);
+        $sk = SkPanitia::create(['nomor' => '134/SK-75.03/V/2025', 'tanggal' => '2025-05-12', 'is_active' => true]);
+        $ketua = $sk->anggota()->create(['nama' => 'Ketua', 'peran' => 'KETUA', 'urutan' => 1, 'is_active' => true]);
+        $sk->anggota()->create(['nama' => 'Nonaktif', 'peran' => 'ANGGOTA', 'urutan' => 3, 'is_active' => false]);
 
         $component = Livewire::test(ManageRisalah::class)
             ->call('createFor', $p->id)
             ->assertSet('permohonan_id', $p->id)
             ->assertSet('showForm', true)
-            // Hanya panitia aktif yang dipra-pilih.
+            // Hanya panitia aktif di bawah SK aktif yang dipra-pilih, dan nomor
+            // SK ikut terisi dari SK yang sama.
+            ->assertSet('sk_panitia_id', $sk->id)
+            ->assertSet('nomor_sk_panitia', '134/SK-75.03/V/2025')
+            ->assertSet('tgl_sk_panitia', '2025-05-12')
             ->assertSet('selectedPanitia', [$ketua->id]);
 
         // Dasar hukum standar terisi otomatis.
@@ -56,8 +61,9 @@ class ManageRisalahTest extends TestCase
     public function test_can_create_risalah_with_panitia_and_pendapat(): void
     {
         $p = $this->permohonan();
-        $ketua = PanitiaPemeriksa::create(['nama' => 'Ketua', 'peran' => 'KETUA', 'urutan' => 1]);
-        $anggota = PanitiaPemeriksa::create(['nama' => 'Anggota', 'peran' => 'ANGGOTA', 'urutan' => 2]);
+        $sk = SkPanitia::create(['nomor' => 'SK-RIS/2025', 'is_active' => true]);
+        $ketua = $sk->anggota()->create(['nama' => 'Ketua', 'peran' => 'KETUA', 'urutan' => 1]);
+        $anggota = $sk->anggota()->create(['nama' => 'Anggota', 'peran' => 'ANGGOTA', 'urutan' => 2]);
 
         Livewire::test(ManageRisalah::class)
             ->call('createFor', $p->id)

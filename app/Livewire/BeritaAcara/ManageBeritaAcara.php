@@ -6,6 +6,7 @@ use App\Livewire\Concerns\WithRiwayatPenguasaan;
 use App\Models\BeritaAcaraPemeriksaan;
 use App\Models\PanitiaPemeriksa;
 use App\Models\Permohonan;
+use App\Models\SkPanitia;
 use App\Support\PanitiaResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -46,6 +47,13 @@ class ManageBeritaAcara extends Component
 
     public string $perda_rtrw = '';
 
+    /**
+     * SK panitia yang dipakai dokumen ini. Diisi otomatis dari SK aktif saat
+     * berita acara dibuat lalu DIKUNCI — mengganti SK aktif tidak mengubah
+     * berita acara yang sudah tersimpan.
+     */
+    public ?string $sk_panitia_id = null;
+
     /** @var array<int, string> dipilihnya panitia (id), urut sesuai tampil */
     public array $selectedPanitia = [];
 
@@ -82,9 +90,10 @@ class ManageBeritaAcara extends Component
         $this->perda_rtrw = self::DEFAULT_PERDA;
         $this->tgl_pemeriksaan = now()->format('Y-m-d');
         $this->loadRiwayat($permohonanId);
-        // Pra-pilih seluruh anggota panitia aktif sesuai urutan.
-        $this->selectedPanitia = PanitiaPemeriksa::where('is_active', true)
-            ->orderBy('urutan')->orderBy('nama')->pluck('id')->all();
+        // SK panitia yang berlaku menentukan penandatangan; seluruh anggotanya
+        // dipra-pilih sesuai urutan tanda tangan.
+        $this->sk_panitia_id = PanitiaResolver::skAktif()?->id;
+        $this->selectedPanitia = PanitiaResolver::anggotaSk($this->sk_panitia_id)->pluck('id')->all();
         $this->showForm = true;
     }
 
@@ -100,6 +109,7 @@ class ManageBeritaAcara extends Component
         $this->keadaan_tanah = $ba->keadaan_tanah ?? '';
         $this->catatan_keberatan = $ba->catatan_keberatan ?? '';
         $this->perda_rtrw = $ba->perda_rtrw ?? '';
+        $this->sk_panitia_id = $ba->sk_panitia_id;
         $this->selectedPanitia = $ba->panitia->pluck('id')->all();
         $this->newPhotos = [];
         $this->showForm = true;
@@ -114,11 +124,47 @@ class ManageBeritaAcara extends Component
             'keadaan_tanah' => ['nullable', 'string'],
             'catatan_keberatan' => ['nullable', 'string'],
             'perda_rtrw' => ['nullable', 'string', 'max:255'],
+            'sk_panitia_id' => ['nullable', 'exists:sk_panitia,id'],
             'selectedPanitia' => ['array'],
             'selectedPanitia.*' => ['exists:panitia_pemeriksa,id'],
             'newPhotos' => ['array'],
             'newPhotos.*' => ['image', 'max:5120'], // maks 5 MB / foto
         ] + $this->riwayatRules();
+    }
+
+    /**
+     * Ganti SK panitia pada form: susunan penandatangan ikut disegarkan dari SK
+     * yang baru dipilih agar nomor SK dan daftar nama tidak pernah berselisih.
+     */
+    public function updatedSkPanitiaId($value): void
+    {
+        $this->selectedPanitia = PanitiaResolver::anggotaSk($value ?: null)->pluck('id')->all();
+    }
+
+    /**
+     * Kandidat penandatangan: anggota aktif di bawah SK dokumen ini, ditambah
+     * anggota yang terlanjur dipilih (mis. sudah dinonaktifkan setelah dokumen
+     * dibuat) supaya centangnya tidak hilang diam-diam.
+     */
+    private function panitiaPilihan()
+    {
+        $skId = $this->sk_panitia_id;
+        $terpilih = array_values($this->selectedPanitia);
+
+        if (! $skId && $terpilih === []) {
+            return collect();
+        }
+
+        return PanitiaPemeriksa::query()
+            ->where(function ($q) use ($skId, $terpilih) {
+                if ($skId) {
+                    $q->where(fn ($w) => $w->where('sk_panitia_id', $skId)->where('is_active', true));
+                }
+                if ($terpilih !== []) {
+                    $q->orWhereIn('id', $terpilih);
+                }
+            })
+            ->orderBy('urutan')->orderBy('nama')->get();
     }
 
     public function save(): void
@@ -134,6 +180,7 @@ class ManageBeritaAcara extends Component
                     'keadaan_tanah' => $data['keadaan_tanah'] ?: null,
                     'catatan_keberatan' => $data['catatan_keberatan'] ?: null,
                     'perda_rtrw' => $data['perda_rtrw'] ?: null,
+                    'sk_panitia_id' => $data['sk_panitia_id'] ?: null,
                 ],
             );
 
@@ -198,7 +245,7 @@ class ManageBeritaAcara extends Component
         $this->reset([
             'editingId', 'permohonan_id', 'nomor_ba', 'tgl_pemeriksaan',
             'keadaan_tanah', 'catatan_keberatan',
-            'perda_rtrw', 'selectedPanitia', 'newPhotos', 'showForm',
+            'perda_rtrw', 'sk_panitia_id', 'selectedPanitia', 'newPhotos', 'showForm',
         ]);
         $this->resetRiwayat();
     }
@@ -250,7 +297,9 @@ class ManageBeritaAcara extends Component
                 })
                 ->latest('created_at')->get(),
             'permohonanList' => Permohonan::with('pemohon')->orderBy('nomor_registrasi')->get(),
-            'panitiaList' => PanitiaPemeriksa::where('is_active', true)->orderBy('urutan')->orderBy('nama')->get(),
+            'panitiaList' => $this->panitiaPilihan(),
+            'skList' => SkPanitia::orderByDesc('is_active')->orderByDesc('tanggal')->orderByDesc('created_at')->get(),
+            'skAktif' => PanitiaResolver::skAktif(),
             'selectedTanah' => $selectedTanah = $this->permohonan_id
                 ? Permohonan::with([
                     'tanah.desa.kecamatan.kabupaten.provinsi', 'tanah.desa.kepalaDesaAktif',

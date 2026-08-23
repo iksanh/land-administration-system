@@ -4,10 +4,10 @@ namespace Tests\Feature;
 
 use App\Livewire\BeritaAcara\ManageBeritaAcara;
 use App\Models\BeritaAcaraPemeriksaan;
-use App\Models\PanitiaPemeriksa;
 use App\Models\Pemohon;
 use App\Models\Permohonan;
 use App\Models\RiwayatPenguasaan;
+use App\Models\SkPanitia;
 use App\Models\Tanah;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -36,8 +36,9 @@ class ManageBeritaAcaraTest extends TestCase
     public function test_can_create_berita_acara_with_panitia(): void
     {
         $p = $this->permohonan();
-        $ketua = PanitiaPemeriksa::create(['nama' => 'Ketua', 'peran' => 'KETUA', 'urutan' => 1]);
-        $anggota = PanitiaPemeriksa::create(['nama' => 'Anggota', 'peran' => 'ANGGOTA', 'urutan' => 2]);
+        $sk = SkPanitia::create(['nomor' => 'SK-BA/2025', 'is_active' => true]);
+        $ketua = $sk->anggota()->create(['nama' => 'Ketua', 'peran' => 'KETUA', 'urutan' => 1]);
+        $anggota = $sk->anggota()->create(['nama' => 'Anggota', 'peran' => 'ANGGOTA', 'urutan' => 2]);
 
         Livewire::test(ManageBeritaAcara::class)
             ->call('createFor', $p->id)
@@ -197,5 +198,42 @@ class ManageBeritaAcaraTest extends TestCase
             ->assertSee('Dikuasai sejak 1996.');
 
         $this->assertStringContainsString('.doc', $res->headers->get('content-disposition'));
+    }
+
+    public function test_active_sk_is_prefilled_and_locked_after_save(): void
+    {
+        $p = $this->permohonan();
+        $skLama = SkPanitia::create(['nomor' => 'SK-LAMA/2025', 'is_active' => true]);
+        $ketua = $skLama->anggota()->create(['nama' => 'Ketua Lama', 'peran' => 'KETUA', 'urutan' => 1]);
+
+        Livewire::test(ManageBeritaAcara::class)
+            ->call('createFor', $p->id)
+            ->assertSet('sk_panitia_id', $skLama->id)
+            ->assertSet('selectedPanitia', [$ketua->id])
+            ->call('save')
+            ->assertHasNoErrors();
+
+        // SK diganti setelah berita acara terbit.
+        $skLama->update(['is_active' => false]);
+        $skBaru = SkPanitia::create(['nomor' => 'SK-BARU/2026', 'is_active' => true]);
+        $skBaru->anggota()->create(['nama' => 'Ketua Baru', 'peran' => 'KETUA', 'urutan' => 1]);
+
+        $ba = BeritaAcaraPemeriksaan::where('permohonan_id', $p->id)->first();
+        $this->assertSame($skLama->id, $ba->sk_panitia_id);
+        $this->assertSame(['Ketua Lama'], $ba->panitia->pluck('nama')->all());
+    }
+
+    public function test_changing_sk_on_the_form_reloads_the_signers(): void
+    {
+        $p = $this->permohonan();
+        $skA = SkPanitia::create(['nomor' => 'SK-A', 'is_active' => true]);
+        $skA->anggota()->create(['nama' => 'Anggota A', 'peran' => 'KETUA', 'urutan' => 1]);
+        $skB = SkPanitia::create(['nomor' => 'SK-B', 'is_active' => false]);
+        $bAnggota = $skB->anggota()->create(['nama' => 'Anggota B', 'peran' => 'KETUA', 'urutan' => 1]);
+
+        Livewire::test(ManageBeritaAcara::class)
+            ->call('createFor', $p->id)
+            ->set('sk_panitia_id', $skB->id)
+            ->assertSet('selectedPanitia', [$bAnggota->id]);
     }
 }

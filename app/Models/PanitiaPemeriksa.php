@@ -21,6 +21,7 @@ class PanitiaPemeriksa extends Model
     const UPDATED_AT = null;
 
     protected $fillable = [
+        'sk_panitia_id',
         'nama',
         'nip',
         'jabatan',
@@ -36,5 +37,10 @@ class PanitiaPemeriksa extends Model
             'is_active' => 'boolean',
             'created_at' => 'datetime',
         ];
+    }
+
+    public function sk()
+    {
+        return $this->belongsTo(SkPanitia::class, 'sk_panitia_id');
     }
 }

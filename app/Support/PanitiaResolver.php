@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Enums\PeranPanitiaEnum;
 use App\Models\PanitiaPemeriksa;
 use App\Models\Permohonan;
+use App\Models\SkPanitia;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
@@ -19,6 +20,31 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
  */
 class PanitiaResolver
 {
+    /** SK panitia yang sedang berlaku (hanya satu yang boleh aktif). */
+    public static function skAktif(): ?SkPanitia
+    {
+        return SkPanitia::where('is_active', true)->orderByDesc('tanggal')->first();
+    }
+
+    /**
+     * Anggota aktif di bawah sebuah SK, urut sesuai tanda tangan. Dipakai untuk
+     * pra-pilih penandatangan di Berita Acara & Risalah agar keduanya selalu
+     * memakai susunan yang sama dengan nomor SK yang tercetak.
+     *
+     * @return Collection<int, PanitiaPemeriksa>
+     */
+    public static function anggotaSk(?string $skId): Collection
+    {
+        if (! $skId) {
+            return new Collection;
+        }
+
+        return PanitiaPemeriksa::where('sk_panitia_id', $skId)
+            ->where('is_active', true)
+            ->orderBy('urutan')->orderBy('nama')
+            ->get();
+    }
+
     /**
      * @param  Collection<int, PanitiaPemeriksa>  $panitia  anggota panitia (dengan pivot)
      */

@@ -94,9 +94,29 @@
 
             {{-- Panitia --}}
             <div class="flex flex-col gap-2">
+                <label class="text-sm font-medium text-gray-700">SK Panitia Pemeriksa Tanah "A"</label>
+                @if ($skList->isEmpty())
+                    <p class="text-xs text-amber-600">Belum ada SK panitia. Buat dulu di menu <a href="{{ route('panitia') }}" class="underline" wire:navigate>Config Panitia</a>.</p>
+                @else
+                    <select wire:model.live="sk_panitia_id"
+                        class="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]">
+                        <option value="">— tanpa SK —</option>
+                        @foreach ($skList as $sk)
+                            <option value="{{ $sk->id }}">{{ $sk->label() }}{{ $sk->is_active ? ' (aktif)' : '' }}</option>
+                        @endforeach
+                    </select>
+                    <span class="text-xs text-gray-400">
+                        Terisi otomatis dari SK aktif saat berita acara dibuat dan tidak ikut berubah bila SK aktif diganti.
+                        Mengganti pilihan di sini akan memuat ulang daftar penandatangan.
+                    </span>
+                @endif
+                @error('sk_panitia_id') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+            </div>
+
+            <div class="flex flex-col gap-2">
                 <label class="text-sm font-medium text-gray-700">Anggota Panitia Penandatangan</label>
                 @if ($panitiaList->isEmpty())
-                    <p class="text-xs text-amber-600">Belum ada anggota panitia aktif. Tambahkan dulu di menu <a href="{{ route('panitia') }}" class="underline" wire:navigate>Panitia Pemeriksa</a>.</p>
+                    <p class="text-xs text-amber-600">SK ini belum punya anggota aktif. Tambahkan dulu di menu <a href="{{ route('panitia') }}" class="underline" wire:navigate>Config Panitia</a>.</p>
                 @else
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                         @foreach ($panitiaList as $anggota)

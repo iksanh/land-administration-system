@@ -21,6 +21,7 @@ class BeritaAcaraPemeriksaan extends Model
         'permohonan_id',
         'nomor_ba',
         'tgl_pemeriksaan',
+        'sk_panitia_id',
         'keadaan_tanah',
         'catatan_keberatan',
         'perda_rtrw',
@@ -38,6 +39,12 @@ class BeritaAcaraPemeriksaan extends Model
     public function permohonan()
     {
         return $this->belongsTo(Permohonan::class, 'permohonan_id');
+    }
+
+    /** SK panitia yang berlaku saat berita acara ini dibuat (snapshot). */
+    public function skPanitia()
+    {
+        return $this->belongsTo(SkPanitia::class, 'sk_panitia_id');
     }
 
     public function panitia()

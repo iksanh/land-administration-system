@@ -61,7 +61,7 @@
                 </a>
 
                 <p class="{{ $heading }}">Master Data</p>
-                @foreach ([['Master Layanan', 'layanan'], ['Master Berkas', 'berkas-item'], ['Pemetaan Berkas', 'map-layanan-berkas'], ['Master Catatan', 'master-catatan'], ['Master Wilayah', 'wilayah'], ['Panitia Pemeriksa', 'panitia']] as [$label, $r])
+                @foreach ([['Master Layanan', 'layanan'], ['Master Berkas', 'berkas-item'], ['Pemetaan Berkas', 'map-layanan-berkas'], ['Master Catatan', 'master-catatan'], ['Master Wilayah', 'wilayah'], ['Config Panitia', 'panitia']] as [$label, $r])
                     <a href="{{ route($r) }}" wire:navigate class="{{ $cls($r) }}">
                         <span class="w-1.5 h-1.5 rounded-full bg-current opacity-50 shrink-0 mx-1.5"></span>
                         {{ $label }}

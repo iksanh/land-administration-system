@@ -31,6 +31,7 @@ class RisalahPanitiaA extends Model
         'jangka_waktu',
         'nomor_sk_panitia',
         'tgl_sk_panitia',
+        'sk_panitia_id',
         'rtrw_kawasan',
         'perda_rtrw',
         'tgl_bap',
@@ -55,6 +56,12 @@ class RisalahPanitiaA extends Model
     public function permohonan()
     {
         return $this->belongsTo(Permohonan::class, 'permohonan_id');
+    }
+
+    /** SK panitia yang berlaku saat risalah ini dibuat (snapshot). */
+    public function skPanitia()
+    {
+        return $this->belongsTo(SkPanitia::class, 'sk_panitia_id');
     }
 
     public function panitia()

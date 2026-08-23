@@ -8,6 +8,7 @@ use App\Models\BeritaAcaraPemeriksaan;
 use App\Models\PanitiaPemeriksa;
 use App\Models\Permohonan;
 use App\Models\RisalahPanitiaA;
+use App\Models\SkPanitia;
 use App\Support\PanitiaResolver;
 use App\Support\RisalahDefaults;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +47,13 @@ class ManageRisalah extends Component
     public string $nomor_sk_panitia = '';
 
     public string $tgl_sk_panitia = '';
+
+    /**
+     * SK panitia yang dipakai risalah ini. Diisi otomatis dari SK aktif saat
+     * risalah dibuat lalu DIKUNCI; nomor & tanggal SK di atas ikut terisi dari
+     * sini supaya yang tercetak selalu cocok dengan daftar penandatangan.
+     */
+    public ?string $sk_panitia_id = null;
 
     public string $rtrw_kawasan = '';
 
@@ -106,9 +114,9 @@ class ManageRisalah extends Component
         $ba = BeritaAcaraPemeriksaan::where('permohonan_id', $permohonanId)->first();
         $this->tgl_bap = $ba?->tgl_pemeriksaan?->format('Y-m-d') ?? '';
 
-        // Pra-pilih seluruh anggota panitia aktif sesuai urutan.
-        $this->selectedPanitia = PanitiaPemeriksa::where('is_active', true)
-            ->orderBy('urutan')->orderBy('nama')->pluck('id')->all();
+        // SK panitia yang berlaku menentukan penandatangan sekaligus nomor SK
+        // yang tercetak pada risalah.
+        $this->applySkPanitia(PanitiaResolver::skAktif()?->id);
         $this->showForm = true;
     }
 
@@ -164,6 +172,7 @@ class ManageRisalah extends Component
         $this->jangka_waktu = $r->jangka_waktu ?? '-';
         $this->nomor_sk_panitia = $r->nomor_sk_panitia ?? '';
         $this->tgl_sk_panitia = $r->tgl_sk_panitia?->format('Y-m-d') ?? '';
+        $this->sk_panitia_id = $r->sk_panitia_id;
         $this->rtrw_kawasan = $r->rtrw_kawasan ?? '';
         $this->perda_rtrw = $r->perda_rtrw ?? '';
         $this->tgl_bap = $r->tgl_bap?->format('Y-m-d') ?? '';
@@ -189,6 +198,7 @@ class ManageRisalah extends Component
             'jangka_waktu' => ['nullable', 'string', 'max:100'],
             'nomor_sk_panitia' => ['nullable', 'string', 'max:150'],
             'tgl_sk_panitia' => ['nullable', 'date'],
+            'sk_panitia_id' => ['nullable', 'exists:sk_panitia,id'],
             'rtrw_kawasan' => ['nullable', 'string', 'max:200'],
             'perda_rtrw' => ['nullable', 'string', 'max:255'],
             'tgl_bap' => ['nullable', 'date'],
@@ -206,6 +216,52 @@ class ManageRisalah extends Component
         // referensi dari Berita Acara (diedit di modul Berita Acara Lapang).
     }
 
+    /**
+     * Terapkan sebuah SK ke form: penandatangan dipra-pilih dari anggota aktif
+     * SK tersebut, dan nomor/tanggal SK yang tercetak ikut disalin — inilah yang
+     * menjaga nomor SK dan daftar nama tidak pernah berselisih.
+     */
+    private function applySkPanitia(?string $skId): void
+    {
+        $this->sk_panitia_id = $skId;
+        $this->selectedPanitia = PanitiaResolver::anggotaSk($skId)->pluck('id')->all();
+
+        $sk = $skId ? SkPanitia::find($skId) : null;
+        $this->nomor_sk_panitia = $sk?->nomor ?? '';
+        $this->tgl_sk_panitia = $sk?->tanggal?->format('Y-m-d') ?? '';
+    }
+
+    /** Ganti SK panitia dari form. */
+    public function updatedSkPanitiaId($value): void
+    {
+        $this->applySkPanitia($value ?: null);
+    }
+
+    /**
+     * Kandidat penandatangan: anggota aktif di bawah SK risalah ini, ditambah
+     * anggota yang terlanjur dipilih supaya centangnya tidak hilang diam-diam.
+     */
+    private function panitiaPilihan()
+    {
+        $skId = $this->sk_panitia_id;
+        $terpilih = array_values($this->selectedPanitia);
+
+        if (! $skId && $terpilih === []) {
+            return collect();
+        }
+
+        return PanitiaPemeriksa::query()
+            ->where(function ($q) use ($skId, $terpilih) {
+                if ($skId) {
+                    $q->where(fn ($w) => $w->where('sk_panitia_id', $skId)->where('is_active', true));
+                }
+                if ($terpilih !== []) {
+                    $q->orWhereIn('id', $terpilih);
+                }
+            })
+            ->orderBy('urutan')->orderBy('nama')->get();
+    }
+
     public function save(): void
     {
         $data = $this->validate();
@@ -220,6 +276,7 @@ class ManageRisalah extends Component
                     'jangka_waktu' => $data['jangka_waktu'] ?: null,
                     'nomor_sk_panitia' => $data['nomor_sk_panitia'] ?: null,
                     'tgl_sk_panitia' => $data['tgl_sk_panitia'] ?: null,
+                    'sk_panitia_id' => $data['sk_panitia_id'] ?: null,
                     'rtrw_kawasan' => $data['rtrw_kawasan'] ?: null,
                     'perda_rtrw' => $data['perda_rtrw'] ?: null,
                     'tgl_bap' => $data['tgl_bap'] ?: null,
@@ -269,7 +326,7 @@ class ManageRisalah extends Component
     {
         $this->reset([
             'editingId', 'permohonan_id', 'nomor_risalah', 'tgl_risalah', 'jenis_hak',
-            'jangka_waktu', 'nomor_sk_panitia', 'tgl_sk_panitia', 'rtrw_kawasan',
+            'jangka_waktu', 'nomor_sk_panitia', 'tgl_sk_panitia', 'sk_panitia_id', 'rtrw_kawasan',
             'perda_rtrw', 'tgl_bap', 'kesimpulan_tambahan', 'data_pendukung',
             'dasar_hukum', 'selectedPanitia', 'pendapat', 'showForm', 'showRiwayatModal',
         ]);
@@ -310,7 +367,8 @@ class ManageRisalah extends Component
                 })
                 ->latest('created_at')->get(),
             'permohonanList' => Permohonan::with('pemohon')->orderBy('nomor_registrasi')->get(),
-            'panitiaList' => PanitiaPemeriksa::where('is_active', true)->orderBy('urutan')->orderBy('nama')->get(),
+            'panitiaList' => $this->panitiaPilihan(),
+            'skList' => SkPanitia::orderByDesc('is_active')->orderByDesc('tanggal')->orderByDesc('created_at')->get(),
             'selectedTanah' => $selectedTanah = $this->permohonan_id
                 ? Permohonan::with([
                     'tanah.desa.kecamatan.kabupaten.provinsi', 'tanah.desa.kepalaDesaAktif',

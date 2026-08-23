@@ -87,17 +87,39 @@
                 </div>
             </div>
 
-            {{-- SK Panitia & kawasan RTRW --}}
+            {{-- SK Panitia (sumber tunggal: Config Panitia) & kawasan RTRW --}}
+            <div class="flex flex-col gap-1.5">
+                <label class="text-sm font-medium text-gray-700">SK Panitia "A"</label>
+                @if ($skList->isEmpty())
+                    <p class="text-xs text-amber-600">Belum ada SK panitia. Buat dulu di menu <a href="{{ route('panitia') }}" class="underline" wire:navigate>Config Panitia</a>.</p>
+                @else
+                    <select wire:model.live="sk_panitia_id"
+                        class="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]">
+                        <option value="">— isi manual —</option>
+                        @foreach ($skList as $sk)
+                            <option value="{{ $sk->id }}">{{ $sk->label() }}{{ $sk->is_active ? ' (aktif)' : '' }}</option>
+                        @endforeach
+                    </select>
+                    <span class="text-xs text-gray-400">
+                        Terisi otomatis dari SK aktif saat risalah dibuat. Nomor, tanggal, dan daftar penandatangan di bawah
+                        ditarik dari SK ini sehingga selalu konsisten.
+                    </span>
+                @endif
+                @error('sk_panitia_id') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="flex flex-col gap-1.5">
                     <label class="text-sm font-medium text-gray-700">Nomor SK Panitia "A"</label>
                     <input type="text" wire:model="nomor_sk_panitia" placeholder="mis. 134/SK-75.03/V/2025"
-                        class="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]">
+                        @if ($sk_panitia_id) readonly @endif
+                        class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff] {{ $sk_panitia_id ? 'bg-gray-100 text-gray-500' : 'bg-white' }}">
                 </div>
                 <div class="flex flex-col gap-1.5">
                     <label class="text-sm font-medium text-gray-700">Tgl. SK Panitia "A"</label>
                     <input type="date" wire:model="tgl_sk_panitia"
-                        class="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]">
+                        @if ($sk_panitia_id) readonly @endif
+                        class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff] {{ $sk_panitia_id ? 'bg-gray-100 text-gray-500' : 'bg-white' }}">
                 </div>
                 <div class="flex flex-col gap-1.5">
                     <label class="text-sm font-medium text-gray-700">Kawasan RTRW (Peta Analisis)</label>
@@ -183,7 +205,7 @@
             <div class="flex flex-col gap-2">
                 <label class="text-sm font-medium text-gray-700">Anggota Panitia & Pendapat</label>
                 @if ($panitiaList->isEmpty())
-                    <p class="text-xs text-amber-600">Belum ada anggota panitia aktif. Tambahkan dulu di menu <a href="{{ route('panitia') }}" class="underline" wire:navigate>Panitia Pemeriksa</a>.</p>
+                    <p class="text-xs text-amber-600">SK ini belum punya anggota aktif. Tambahkan dulu di menu <a href="{{ route('panitia') }}" class="underline" wire:navigate>Config Panitia</a>.</p>
                 @else
                     <div class="flex flex-col gap-2">
                         @foreach ($panitiaList as $anggota)
