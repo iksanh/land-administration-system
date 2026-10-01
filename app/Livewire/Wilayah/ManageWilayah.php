@@ -2,11 +2,13 @@
 
 namespace App\Livewire\Wilayah;
 
+use App\Enums\JenisDesaEnum;
 use App\Models\RefDesa;
 use App\Models\RefKabupaten;
 use App\Models\RefKecamatan;
 use App\Models\RefKepalaDesa;
 use App\Models\RefProvinsi;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -42,6 +44,9 @@ class ManageWilayah extends Component
     public string $desaNama = '';
 
     public string $desaKepala = '';
+
+    /** DESA atau KELURAHAN — menentukan sebutan yang tercetak pada dokumen. */
+    public string $desaJenis = 'DESA';
 
     // Kelola kepala desa (modal) untuk desa terpilih.
     public string $kadesDesaId = '';
@@ -138,19 +143,21 @@ class ManageWilayah extends Component
             'desaId' => ['required', 'string', 'max:10', 'unique:ref_desa,id'],
             'desaNama' => ['required', 'string', 'max:100'],
             'desaKepala' => ['nullable', 'string', 'max:200'],
+            'desaJenis' => ['required', Rule::enum(JenisDesaEnum::class)],
         ]);
 
         RefDesa::create([
             'id' => $data['desaId'],
             'kecamatan_id' => $this->selKecamatan,
             'nama' => $data['desaNama'],
+            'jenis' => $data['desaJenis'],
             'nama_kepala_desa' => $data['desaKepala'] ?: null,
         ]);
-        $this->reset(['desaId', 'desaNama', 'desaKepala']);
-        session()->flash('message', 'Desa berhasil ditambahkan.');
+        $this->reset(['desaId', 'desaNama', 'desaKepala', 'desaJenis']);
+        session()->flash('message', 'Wilayah berhasil ditambahkan.');
     }
 
-    /** Buka modal pengelolaan kepala desa untuk sebuah desa. */
+    /** Buka modal pengelolaan kepala desa/lurah untuk sebuah wilayah. */
     public function manageKades(string $desaId): void
     {
         $this->kadesDesaId = $desaId;
@@ -228,7 +235,10 @@ class ManageWilayah extends Component
     public function resetKadesForm(): void
     {
         $this->reset(['kadesEditingId', 'kadesNama', 'kadesNip', 'kadesPeriode']);
-        $this->kadesJabatan = 'Kepala Desa';
+        // Jabatan bawaan mengikuti jenis wilayah: "Kepala Desa" atau "Lurah".
+        $this->kadesJabatan = $this->kadesDesaId
+            ? (RefDesa::find($this->kadesDesaId)?->sebutanKepala() ?? 'Kepala Desa')
+            : 'Kepala Desa';
         $this->kadesAktif = true;
     }
 

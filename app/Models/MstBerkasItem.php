@@ -17,7 +17,7 @@ class MstBerkasItem extends Model
 
     public $timestamps = false;
 
-    protected $fillable = ['nama', 'is_mandatory', 'catatan', 'parent_id'];
+    protected $fillable = ['nama', 'kode', 'is_mandatory', 'catatan', 'parent_id'];
 
     protected $attributes = ['is_mandatory' => true];
 

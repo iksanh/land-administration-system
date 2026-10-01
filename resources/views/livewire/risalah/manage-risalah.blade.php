@@ -128,45 +128,12 @@
                 </div>
             </div>
 
-            {{-- Riwayat perolehan tanah — READ-ONLY, referensi dari Berita Acara.
-                 Diedit hanya di modul Berita Acara; di sini cukup ditinjau. --}}
-            @php $poinRiwayat = array_values(array_filter(array_map('trim', $riwayat_penguasaan))); @endphp
-            <div class="flex flex-col gap-2">
-                <div class="flex items-center justify-between gap-2 flex-wrap">
-                    <label class="text-sm font-medium text-gray-700">Riwayat Perolehan Tanah</label>
-                    <span class="text-[11px] text-gray-400 inline-flex items-center gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 0h10.5a2.25 2.25 0 0 1 2.25 2.25v6.75a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-6.75a2.25 2.25 0 0 1 2.25-2.25Z"/></svg>
-                        Bersumber dari Berita Acara — tidak dapat diedit di sini
-                    </span>
-                </div>
-                @if (count($poinRiwayat))
-                    <div class="border border-gray-200 rounded-md bg-white px-4 py-3 flex items-center justify-between gap-3">
-                        <div class="min-w-0">
-                            <p class="text-sm text-gray-700 font-medium">{{ count($poinRiwayat) }} poin riwayat penguasaan</p>
-                            <p class="text-xs text-gray-500 truncate">{{ \Illuminate\Support\Str::limit($poinRiwayat[0], 90) }}</p>
-                            @if ($beritaAcara)
-                                <p class="text-[11px] text-gray-400 mt-0.5">
-                                    Berita Acara{{ $beritaAcara->nomor_ba ? ' No. '.$beritaAcara->nomor_ba : '' }}{{ $beritaAcara->tgl_pemeriksaan ? ' — '.$beritaAcara->tgl_pemeriksaan->locale('id')->translatedFormat('d F Y') : '' }}
-                                </p>
-                            @endif
-                        </div>
-                        <button type="button" wire:click="showRiwayatDetail"
-                            class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-[#91caff] text-[#1677ff] bg-[#e6f4ff] hover:bg-[#bae0ff]">
-                            🔍 Lihat Detail
-                        </button>
-                    </div>
-                @else
-                    <div class="border border-[#ffe58f] bg-[#fffbe6] rounded-md px-4 py-3 text-sm text-[#ad8b00]">
-                        Riwayat penguasaan belum diisi.
-                        @if ($permohonan_id)
-                            Silakan isi terlebih dahulu melalui
-                            <a href="{{ route('berita-acara', ['permohonan' => $permohonan_id]) }}" class="underline font-medium" wire:navigate>Berita Acara Lapang</a>.
-                        @else
-                            Pilih permohonan terlebih dahulu.
-                        @endif
-                    </div>
-                @endif
-            </div>
+            {{-- Riwayat perolehan tanah: data bersama, diinput di modul Riwayat
+                 Tanah. Di sini ringkasan + editor modal yang menyimpan terpisah. --}}
+            @include('livewire.riwayat-tanah._ringkasan', [
+                'permohonanId' => $permohonan_id,
+                'label' => 'Riwayat Perolehan Tanah',
+            ])
 
             {{-- Data pendukung (terlampir) --}}
             @include('livewire._list-editor', [
@@ -304,46 +271,9 @@
         </table>
     </div>
 
-    {{-- Modal detail riwayat penguasaan (read-only, referensi Berita Acara) --}}
-    @if ($showRiwayatModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" wire:key="riwayat-modal">
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-                <div class="flex items-start justify-between gap-4 px-5 py-3 border-b border-gray-200">
-                    <div>
-                        <h3 class="font-semibold text-gray-800">Detail Riwayat Penguasaan</h3>
-                        <p class="text-[11px] text-gray-500 mt-0.5">Bersumber dari Berita Acara Pemeriksaan Lapang — hanya dapat diubah di modul Berita Acara.</p>
-                    </div>
-                    <button type="button" wire:click="closeRiwayatModal" class="shrink-0 bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-1.5 text-sm hover:bg-gray-50">Tutup</button>
-                </div>
-                <div class="overflow-y-auto p-6 flex flex-col gap-4">
-                    @if ($beritaAcara)
-                        <div class="text-xs text-gray-500 flex flex-wrap gap-x-6 gap-y-1 border-b border-gray-100 pb-3">
-                            <span>No. Berita Acara: <span class="font-medium text-gray-700">{{ $beritaAcara->nomor_ba ?: '—' }}</span></span>
-                            <span>Tgl. Pemeriksaan: <span class="font-medium text-gray-700">{{ $beritaAcara->tgl_pemeriksaan?->locale('id')->translatedFormat('d F Y') ?? '—' }}</span></span>
-                        </div>
-                    @endif
-                    @php $poinDetail = array_values(array_filter(array_map('trim', $riwayat_penguasaan))); @endphp
-                    @forelse ($poinDetail as $i => $baris)
-                        <div class="flex items-start gap-3" wire:key="riwayat-detail-{{ $i }}">
-                            <span class="mt-0.5 w-6 h-6 shrink-0 rounded-full bg-[#e6f4ff] text-[#1677ff] text-xs font-bold flex items-center justify-center">{{ $i + 1 }}</span>
-                            <p class="text-sm text-gray-700 whitespace-pre-line leading-relaxed">{{ $baris }}</p>
-                        </div>
-                    @empty
-                        <p class="text-sm text-gray-400 text-center py-6">Belum ada riwayat penguasaan pada Berita Acara permohonan ini.</p>
-                    @endforelse
-                </div>
-                <div class="px-5 py-3 border-t border-gray-200 flex justify-end gap-2">
-                    @if ($permohonan_id)
-                        <a href="{{ route('berita-acara', ['permohonan' => $permohonan_id]) }}" wire:navigate
-                            class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium border border-[#87e8de] text-[#08979c] bg-white hover:bg-[#e6fffb]">
-                            Buka Berita Acara
-                        </a>
-                    @endif
-                    <button type="button" wire:click="closeRiwayatModal" class="bg-[#1677ff] hover:bg-[#0958d9] text-white rounded-md px-4 py-1.5 text-sm font-medium">Selesai</button>
-                </div>
-            </div>
-        </div>
-    @endif
+    {{-- Editor riwayat penguasaan (di luar <form> agar tombolnya tidak men-submit
+         risalah; riwayat disimpan lewat aksinya sendiri). --}}
+    @include('livewire.riwayat-tanah._modal')
 
     {{-- Modal pratinjau cetak: menampilkan dokumen di layar; tombol Cetak mencetak
          lewat iframe tersembunyi yang memuat rute standalone, sehingga dialog printer

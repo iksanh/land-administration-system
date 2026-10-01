@@ -21,6 +21,10 @@ use Livewire\Component;
  * auto-isi dari permohonan. Menambah field khusus risalah — data pendukung &
  * dasar hukum (daftar terurut via WithOrderedLists) serta pendapat per anggota
  * panitia (disimpan di pivot risalah_panitia).
+ *
+ * Riwayat penguasaan bukan milik komponen ini — diinput di modul Riwayat Tanah
+ * (/riwayat-tanah); di sini hanya ringkasan + editor modal yang menyimpan lewat
+ * aksinya sendiri (trait WithRiwayatPenguasaan::simpanRiwayat).
  */
 #[Layout('components.layouts.app')]
 class ManageRisalah extends Component
@@ -76,7 +80,6 @@ class ManageRisalah extends Component
     public array $pendapat = [];
 
     /** Modal detail riwayat penguasaan (read-only, referensi Berita Acara). */
-    public bool $showRiwayatModal = false;
 
     // Modal pratinjau cetak (mengikuti pola Pemeriksaan Berkas & Berita Acara):
     // dokumen ditampilkan di layar; tombol Cetak mencetak lewat iframe tersembunyi.
@@ -135,17 +138,6 @@ class ManageRisalah extends Component
         $this->loadRiwayat($value);
         $ba = BeritaAcaraPemeriksaan::where('permohonan_id', $value)->first();
         $this->tgl_bap = $ba?->tgl_pemeriksaan?->format('Y-m-d') ?? '';
-    }
-
-    /** Buka modal detail riwayat penguasaan (bersumber dari Berita Acara). */
-    public function showRiwayatDetail(): void
-    {
-        $this->showRiwayatModal = true;
-    }
-
-    public function closeRiwayatModal(): void
-    {
-        $this->showRiwayatModal = false;
     }
 
     /** Buka modal pratinjau cetak untuk sebuah Risalah. */
@@ -212,8 +204,8 @@ class ManageRisalah extends Component
             'pendapat' => ['array'],
             'pendapat.*' => ['nullable', 'string'],
         ];
-        // Riwayat penguasaan tidak divalidasi/disimpan di sini — bersifat read-only,
-        // referensi dari Berita Acara (diedit di modul Berita Acara Lapang).
+        // Riwayat penguasaan tidak divalidasi di sini — disimpan lewat aksinya
+        // sendiri (simpanRiwayat), bukan lewat aksi simpan risalah.
     }
 
     /**
@@ -286,9 +278,6 @@ class ManageRisalah extends Component
                 ],
             );
 
-            // Riwayat penguasaan TIDAK disimpan dari sini — read-only, bersumber
-            // dari Berita Acara (record 1:1 per permohonan diedit di modul BA).
-
             // Sinkron panitia + simpan urutan tampil dan pendapat per anggota.
             $sync = [];
             foreach (array_values($this->selectedPanitia) as $i => $panitiaId) {
@@ -328,7 +317,7 @@ class ManageRisalah extends Component
             'editingId', 'permohonan_id', 'nomor_risalah', 'tgl_risalah', 'jenis_hak',
             'jangka_waktu', 'nomor_sk_panitia', 'tgl_sk_panitia', 'sk_panitia_id', 'rtrw_kawasan',
             'perda_rtrw', 'tgl_bap', 'kesimpulan_tambahan', 'data_pendukung',
-            'dasar_hukum', 'selectedPanitia', 'pendapat', 'showForm', 'showRiwayatModal',
+            'dasar_hukum', 'selectedPanitia', 'pendapat', 'showForm',
         ]);
         $this->jenis_hak = 'Hak Milik';
         $this->jangka_waktu = '-';
@@ -348,6 +337,7 @@ class ManageRisalah extends Component
                 'permohonan.tanah.desa.kepalaDesaAktif',
                 'permohonan.riwayatPenguasaan',
                 'panitia',
+                'skPanitia',
             ])->find($this->printId);
 
             if ($printRisalah) {
@@ -376,10 +366,6 @@ class ManageRisalah extends Component
                 ])->find($this->permohonan_id)
                 : null,
             'kepalaDesaOtomatis' => ($selectedTanah?->tanah?->desa ?? $selectedTanah?->pemohon?->desa)?->kepalaDesaAktif ?? collect(),
-            // Berita Acara sebagai sumber riwayat penguasaan (read-only di Risalah).
-            'beritaAcara' => $this->permohonan_id
-                ? BeritaAcaraPemeriksaan::where('permohonan_id', $this->permohonan_id)->first()
-                : null,
         ]);
     }
 }

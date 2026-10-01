@@ -44,18 +44,12 @@ class ManageBeritaAcaraTest extends TestCase
             ->call('createFor', $p->id)
             ->assertSet('permohonan_id', $p->id)
             ->set('tgl_pemeriksaan', '2025-01-13')
-            ->set('riwayat_penguasaan', ['Dikuasai Rasid Nusi sejak 1996.', 'Dijual ke Abdul Wahab 2003.', '   '])
             ->set('selectedPanitia', [$ketua->id, $anggota->id])
             ->call('save')
             ->assertHasNoErrors();
 
         $ba = BeritaAcaraPemeriksaan::where('permohonan_id', $p->id)->first();
         $this->assertNotNull($ba);
-        // Poin kosong dibuang, urutan dipertahankan — kini di record riwayat tersendiri.
-        $this->assertSame(
-            ['Dikuasai Rasid Nusi sejak 1996.', 'Dijual ke Abdul Wahab 2003.'],
-            $p->riwayatPenguasaan->poin,
-        );
         $this->assertCount(2, $ba->panitia);
     }
 
@@ -82,18 +76,19 @@ class ManageBeritaAcaraTest extends TestCase
 
         Livewire::test(ManageBeritaAcara::class)
             ->call('createFor', $p->id)
+            ->call('openRiwayat', $p->id)
             ->set('riwayat_penguasaan', ['Poin awal.'])
-            ->call('save')
-            ->call('createFor', $p->id) // buka ulang -> edit
+            ->call('simpanRiwayat')
+            ->call('openRiwayat', $p->id) // buka ulang -> edit
             ->set('riwayat_penguasaan', ['Poin diperbarui.', 'Poin kedua.'])
-            ->call('save')
+            ->call('simpanRiwayat')
             ->assertHasNoErrors();
 
         // Satu record riwayat per permohonan (updateOrCreate, tidak menggandakan).
         $this->assertSame(1, RiwayatPenguasaan::where('permohonan_id', $p->id)->count());
         $this->assertSame(
             ['Poin diperbarui.', 'Poin kedua.'],
-            $p->riwayatPenguasaan->poin,
+            $p->fresh()->riwayatPenguasaan->poin,
         );
     }
 
@@ -104,7 +99,7 @@ class ManageBeritaAcaraTest extends TestCase
 
         $component = Livewire::test(ManageBeritaAcara::class)
             ->call('createFor', $p->id)
-            ->set('newPhotos', [UploadedFile::fake()->image('lapang.jpg')])
+            ->set('newPhotos', [UploadedFile::fake()->image('lapang.png', 1200, 900)])
             ->call('save')
             ->assertHasNoErrors();
 
@@ -235,5 +230,30 @@ class ManageBeritaAcaraTest extends TestCase
             ->call('createFor', $p->id)
             ->set('sk_panitia_id', $skB->id)
             ->assertSet('selectedPanitia', [$bAnggota->id]);
+    }
+
+    public function test_riwayat_is_saved_by_its_own_action_not_by_saving_the_berita_acara(): void
+    {
+        $p = $this->permohonan();
+
+        $component = Livewire::test(ManageBeritaAcara::class)
+            ->call('createFor', $p->id)
+            ->call('openRiwayat', $p->id)
+            ->assertSet('showRiwayatModal', true)
+            ->set('riwayat_penguasaan', ['Dikuasai Rasid Nusi sejak 1996.', 'Dijual ke Abdul Wahab 2003.', '   ']);
+
+        // Menyimpan berita acara TIDAK ikut menyimpan riwayat.
+        $component->call('save')->assertHasNoErrors();
+        $this->assertNull($p->fresh()->riwayatPenguasaan);
+
+        // Riwayat punya aksi simpannya sendiri; poin kosong dibuang, urutan tetap.
+        $component->call('simpanRiwayat')
+            ->assertHasNoErrors()
+            ->assertSet('showRiwayatModal', false);
+
+        $this->assertSame(
+            ['Dikuasai Rasid Nusi sejak 1996.', 'Dijual ke Abdul Wahab 2003.'],
+            $p->fresh()->riwayatPenguasaan->poin,
+        );
     }
 }

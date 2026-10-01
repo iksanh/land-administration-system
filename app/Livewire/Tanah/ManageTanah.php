@@ -19,24 +19,47 @@ class ManageTanah extends Component
     use WithWilayahPicker;
 
     public string $search = '';
+
     public bool $showForm = false;
+
     public ?string $editingId = null;
 
     public string $pemohon_id = '';
+
     public string $desa_id = '';
+
     public string $luas = '';
+
     public string $luas_surat = '';
+
     public string $penggunaan_tanah = '';
+
     public string $nomor_pbt = '';
+
     public string $tanggal_pbt = '';
+
     public string $nib = '';
+
     public string $tgl_peta_analisis = '';
+
     public string $rencana_penggunaan_rtrw = '';
+
     public string $kesesuaian_penggunaan_tanah = '';
+
     public string $penggunaan_tanah_sk = '';
+
+    public string $rtrw_kawasan = '';
+
+    public string $pejabat_peta_analisis = '';
+
+    public string $nip_peta_analisis = '';
+
     public string $batas_utara = '';
+
     public string $batas_timur = '';
+
     public string $batas_selatan = '';
+
     public string $batas_barat = '';
 
     protected function rules(): array
@@ -54,6 +77,9 @@ class ManageTanah extends Component
             'rencana_penggunaan_rtrw' => ['nullable', 'string', 'max:200'],
             'kesesuaian_penggunaan_tanah' => ['nullable', 'string', 'max:50'],
             'penggunaan_tanah_sk' => ['nullable', 'string', 'max:200'],
+            'rtrw_kawasan' => ['nullable', 'string', 'max:200'],
+            'pejabat_peta_analisis' => ['nullable', 'string', 'max:200'],
+            'nip_peta_analisis' => ['nullable', 'string', 'max:30'],
             'batas_utara' => ['nullable', 'string'],
             'batas_timur' => ['nullable', 'string'],
             'batas_selatan' => ['nullable', 'string'],
@@ -97,6 +123,9 @@ class ManageTanah extends Component
         $this->rencana_penggunaan_rtrw = $t->rencana_penggunaan_rtrw ?? '';
         $this->kesesuaian_penggunaan_tanah = $t->kesesuaian_penggunaan_tanah ?? '';
         $this->penggunaan_tanah_sk = $t->penggunaan_tanah_sk ?? '';
+        $this->rtrw_kawasan = $t->rtrw_kawasan ?? '';
+        $this->pejabat_peta_analisis = $t->pejabat_peta_analisis ?? '';
+        $this->nip_peta_analisis = $t->nip_peta_analisis ?? '';
         $this->batas_utara = $t->batas_utara ?? '';
         $this->batas_timur = $t->batas_timur ?? '';
         $this->batas_selatan = $t->batas_selatan ?? '';
@@ -116,6 +145,7 @@ class ManageTanah extends Component
             'editingId', 'showForm', 'pemohon_id', 'desa_id', 'luas', 'luas_surat',
             'penggunaan_tanah', 'nomor_pbt', 'tanggal_pbt', 'nib',
             'tgl_peta_analisis', 'rencana_penggunaan_rtrw', 'kesesuaian_penggunaan_tanah', 'penggunaan_tanah_sk',
+            'rtrw_kawasan', 'pejabat_peta_analisis', 'nip_peta_analisis',
             'batas_utara', 'batas_timur', 'batas_selatan', 'batas_barat',
         ]);
         $this->resetWilayah();

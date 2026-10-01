@@ -15,12 +15,20 @@ use RuntimeException;
  * `riwayat_penguasaan`, jadi seluruh dokumen dari permohonan yang sama berbagi
  * teks yang identik.
  *
- * Pasangkan dengan partial view `livewire.riwayat-tanah._editor` (nama wire:click
- * sudah cocok). Cara memasang di komponen host:
- *   - edit()/createFor(): $this->loadRiwayat($permohonanId);
- *   - save():             di dalam DB::transaction, $this->saveRiwayat($permohonanId);
- *   - resetForm():        $this->resetRiwayat();
- *   - rules():            array_merge(parent-rules, $this->riwayatRules());
+ * Dua cara memasang (nama wire:click pada partial sudah cocok):
+ *
+ * 1. Editor penuh — partial `livewire.riwayat-tanah._editor`. Dipakai halaman
+ *    ManageRiwayatTanah yang memang bertugas menginput riwayat.
+ *      - edit()/createFor(): $this->loadRiwayat($permohonanId);
+ *      - save():             $this->saveRiwayat($permohonanId);
+ *      - resetForm():        $this->resetRiwayat();
+ *      - rules():            array_merge(parent-rules, $this->riwayatRules());
+ *
+ * 2. Ringkasan + editor modal — partial `_ringkasan` & `_modal`. Dipakai dokumen
+ *    yang hanya MEMAKAI riwayat (Berita Acara, Risalah): riwayat tampil sebagai
+ *    kartu ringkas, dan tombolnya membuka modal yang menyimpan riwayat lewat
+ *    simpanRiwayat() — terpisah dari aksi simpan dokumen induknya, sehingga satu
+ *    dokumen tidak pernah jadi pemilik data yang dipakai bersama.
  */
 trait WithRiwayatPenguasaan
 {
@@ -34,6 +42,12 @@ trait WithRiwayatPenguasaan
     public array $typoResults = [];
 
     public ?string $typoError = null;
+
+    /** Modal editor riwayat (dipakai host yang hanya menampilkan ringkasan). */
+    public bool $showRiwayatModal = false;
+
+    /** Permohonan yang riwayatnya sedang dibuka di modal. */
+    public ?string $riwayatPermohonanId = null;
 
     /** Aturan validasi riwayat, digabung ke rules() host. */
     public function riwayatRules(): array
@@ -68,7 +82,50 @@ trait WithRiwayatPenguasaan
 
     public function resetRiwayat(): void
     {
-        $this->reset(['riwayat_penguasaan', 'typoIndex', 'typoResults', 'typoError']);
+        $this->reset([
+            'riwayat_penguasaan', 'typoIndex', 'typoResults', 'typoError',
+            'showRiwayatModal', 'riwayatPermohonanId',
+        ]);
+    }
+
+    // ---- Editor modal (host yang hanya menampilkan ringkasan) ---------------
+
+    /** Buka modal editor riwayat untuk sebuah permohonan. */
+    public function openRiwayat(string $permohonanId): void
+    {
+        $this->riwayatPermohonanId = $permohonanId;
+        $this->loadRiwayat($permohonanId);
+        $this->cancelTypo();
+        $this->showRiwayatModal = true;
+    }
+
+    /**
+     * Simpan riwayat dari modal — berdiri sendiri, tidak menunggu dokumen induk
+     * disimpan, karena riwayat dipakai bersama Berita Acara, Risalah, dan SK.
+     */
+    public function simpanRiwayat(): void
+    {
+        if (! $this->riwayatPermohonanId) {
+            return;
+        }
+
+        $this->validate($this->riwayatRules());
+        $this->saveRiwayat($this->riwayatPermohonanId);
+        // closeRiwayat() memuat ulang dari DB, jadi kotak teks langsung
+        // memantulkan hasil bersih (poin kosong sudah dibuang).
+        $this->closeRiwayat();
+
+        session()->flash('message', 'Riwayat penguasaan berhasil disimpan.');
+    }
+
+    /** Tutup modal tanpa menyimpan; teks dikembalikan ke isi tersimpan. */
+    public function closeRiwayat(): void
+    {
+        if ($this->riwayatPermohonanId) {
+            $this->loadRiwayat($this->riwayatPermohonanId);
+        }
+        $this->cancelTypo();
+        $this->reset(['showRiwayatModal', 'riwayatPermohonanId']);
     }
 
     /** Tambah satu poin riwayat penguasaan kosong di akhir. */

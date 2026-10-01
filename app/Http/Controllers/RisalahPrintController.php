@@ -23,6 +23,7 @@ class RisalahPrintController extends Controller
             'permohonan.tanah.desa.kepalaDesaAktif',
             'permohonan.riwayatPenguasaan',
             'panitia',
+            'skPanitia',
         ]);
 
         // Kepala desa aktif dari desa lokasi tanah ikut sebagai penandatangan.

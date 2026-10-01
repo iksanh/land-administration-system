@@ -14,6 +14,19 @@ class RisalahDefaults
     public const DASAR_PANITIA = 'Peraturan Menteri Agraria dan Tata Ruang/Kepala Badan Pertanahan Nasional Nomor 18 Tahun 2021 tentang Tata Cara Penetapan Hak Pengelolaan dan Hak Atas Tanah';
 
     /**
+     * Paragraf penutup bagian IX "Pendapat Anggota Panitia" — kalimat baku yang
+     * selalu tercantum setelah pendapat seluruh anggota (lihat docs/RISALAH.pdf).
+     */
+    public static function penutupPendapat(string $jenisHak): string
+    {
+        return 'Bahwa kami seluruh anggota berpendapat permohonan '.$jenisHak.' atas nama pemohon dapat '
+            .'diberikan, namun apabila di atas bidang tanah yang diberikan '.$jenisHak.' terdapat keberatan, '
+            .'permasalahan, penguasaan dan/atau pemilikan hak lain yang timbul dikemudian hari, maka penerima '
+            .'hak wajib menyelesaikan permasalahan tersebut tanpa melibatkan Panitia A Kantor Pertanahan '
+            .'Kabupaten Bone Bolango dan Surat Keputusan Haknya yang akan diterbitkan batal demi hukum.';
+    }
+
+    /**
      * Daftar dasar hukum standar (urut sebagaimana lazim tercantum pada risalah).
      *
      * @return array<int, string>

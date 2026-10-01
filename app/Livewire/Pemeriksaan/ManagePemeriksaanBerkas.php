@@ -7,13 +7,18 @@ use App\Enums\PermohonanStatusEnum;
 use App\Models\MapLayananBerkas;
 use App\Models\MstCatatan;
 use App\Models\PemeriksaanBerkas;
+use App\Models\PemeriksaanBerkasFile;
 use App\Models\Permohonan;
 use App\Models\PermohonanAuditLog;
 use App\Support\PemeriksaanSheet;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 
 /**
  * Ports app/api/routes/pemeriksaan_berkas.py — per-permohonan document check.
@@ -26,6 +31,8 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class ManagePemeriksaanBerkas extends Component
 {
+    use WithFileUploads;
+
     public string $selectedPermohonan = '';
 
     /**
@@ -51,6 +58,18 @@ class ManagePemeriksaanBerkas extends Component
     // Print preview modal
     public bool $showPrint = false;
 
+    // Unggah berkas (massal). $uploads = file sementara yang di-drag; $uploadMap
+    // memetakan index file -> berkas_item_id (tebakan dari kode, bisa dikoreksi).
+    public bool $showUpload = false;
+
+    /** @var array<int, TemporaryUploadedFile> */
+    public array $uploads = [];
+
+    /** @var array<int, string> index file -> berkas_item_id terpilih */
+    public array $uploadMap = [];
+
+    private const UPLOAD_MAX_KB = 10240; // 10 MB / file
+
     /**
      * Dukung tautan langsung dari halaman lain (mis. tombol aksi di
      * /permohonan): /pemeriksaan-berkas?permohonan=<id> membuka halaman
@@ -65,11 +84,12 @@ class ManagePemeriksaanBerkas extends Component
         }
     }
 
-    /** Ganti permohonan mengosongkan pencarian & menutup editor. */
+    /** Ganti permohonan mengosongkan pencarian & menutup editor/unggahan. */
     public function updatedSelectedPermohonan(): void
     {
         $this->search = '';
         $this->cancelPeriksa();
+        $this->reset(['uploads', 'uploadMap', 'showUpload']);
     }
 
     /** Pilih permohonan dari dropdown combobox. */
@@ -165,6 +185,163 @@ class ManagePemeriksaanBerkas extends Component
     public function closePrint(): void
     {
         $this->showPrint = false;
+    }
+
+    /** Buka modal unggah berkas (kosongkan sisa unggahan sebelumnya). */
+    public function openUpload(): void
+    {
+        $this->reset(['uploads', 'uploadMap']);
+        $this->showUpload = true;
+    }
+
+    public function closeUpload(): void
+    {
+        $this->reset(['uploads', 'uploadMap', 'showUpload']);
+    }
+
+    /**
+     * Saat file baru masuk, tebak pemetaan berkas dari kode di nama file untuk
+     * setiap file yang belum punya pilihan; buang pemetaan file yang sudah dilepas.
+     */
+    public function updatedUploads(): void
+    {
+        $candidates = $this->candidateBerkas();
+
+        foreach ($this->uploads as $i => $file) {
+            if (! array_key_exists($i, $this->uploadMap)) {
+                $this->uploadMap[$i] = $this->guessBerkasId($file->getClientOriginalName(), $candidates);
+            }
+        }
+
+        // Lepas pemetaan untuk file yang sudah tidak ada lagi di daftar unggahan.
+        $this->uploadMap = array_intersect_key($this->uploadMap, $this->uploads);
+    }
+
+    /** Buang satu file dari antrean unggah sebelum disimpan. */
+    public function removeUpload(int $index): void
+    {
+        unset($this->uploads[$index], $this->uploadMap[$index]);
+    }
+
+    /** Daftar berkas (MstBerkasItem) milik layanan permohonan terpilih. */
+    private function candidateBerkas(): Collection
+    {
+        $p = $this->selectedPermohonan ? Permohonan::find($this->selectedPermohonan) : null;
+
+        if (! $p || ! $p->layanan_id) {
+            return collect();
+        }
+
+        return MapLayananBerkas::with('berkasItem')
+            ->where('layanan_id', $p->layanan_id)
+            ->orderBy('urutan')
+            ->get()
+            ->pluck('berkasItem')
+            ->filter()
+            ->values();
+    }
+
+    /**
+     * Tebak berkas_item_id dari nama file dengan mencocokkan `kode` berkas.
+     * Normalisasi ke huruf/angka besar; kode terpanjang diprioritaskan agar
+     * kode pendek (mis. "KK") tidak mengalahkan kode yang lebih spesifik.
+     * Mengembalikan '' bila tak ada yang cocok (dipilih manual).
+     */
+    private function guessBerkasId(string $filename, Collection $candidates): string
+    {
+        $norm = preg_replace('/[^A-Z0-9]/', '', strtoupper(pathinfo($filename, PATHINFO_FILENAME)));
+
+        if ($norm === '') {
+            return '';
+        }
+
+        $withKode = $candidates
+            ->filter(fn ($b) => filled($b->kode))
+            ->sortByDesc(fn ($b) => strlen($b->kode));
+
+        foreach ($withKode as $b) {
+            $kode = preg_replace('/[^A-Z0-9]/', '', strtoupper($b->kode));
+            if ($kode === '') {
+                continue;
+            }
+            if (str_contains($norm, $kode)) {
+                return $b->id;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Simpan file yang sudah dipetakan ke disk privat + baris
+     * pemeriksaan_berkas_file. File tanpa pemetaan dilewati (bukan gagal).
+     * Tidak mengubah status pemeriksaan.
+     */
+    public function saveUploads(): void
+    {
+        if (! $this->selectedPermohonan) {
+            return;
+        }
+
+        $this->validate([
+            'uploads' => ['required', 'array', 'min:1'],
+            'uploads.*' => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:'.self::UPLOAD_MAX_KB],
+        ], [
+            'uploads.required' => 'Belum ada file yang dipilih.',
+            'uploads.*.mimes' => 'Hanya file PDF, JPG, atau PNG yang diizinkan.',
+            'uploads.*.max' => 'Ukuran file maksimal 10 MB.',
+        ]);
+
+        $candidateIds = $this->candidateBerkas()->pluck('id')->all();
+
+        $saved = 0;
+        $skipped = 0;
+        foreach ($this->uploads as $i => $file) {
+            $berkasId = $this->uploadMap[$i] ?? '';
+            if ($berkasId === '' || ! in_array($berkasId, $candidateIds, true)) {
+                $skipped++;
+
+                continue;
+            }
+
+            $path = $file->store('pemeriksaan/'.$this->selectedPermohonan, 'local');
+
+            PemeriksaanBerkasFile::create([
+                'permohonan_id' => $this->selectedPermohonan,
+                'berkas_item_id' => $berkasId,
+                'file_path' => $path,
+                'nama_asli' => $file->getClientOriginalName(),
+                'ukuran' => $file->getSize(),
+                'mime' => $file->getMimeType(),
+                'uploaded_by' => Auth::id(),
+            ]);
+            $saved++;
+        }
+
+        $this->reset(['uploads', 'uploadMap', 'showUpload']);
+
+        $msg = "{$saved} file tersimpan";
+        if ($skipped > 0) {
+            $msg .= ", {$skipped} dilewati (belum dipetakan ke berkas)";
+        }
+        session()->flash('message', $msg.'.');
+    }
+
+    /** Hapus satu file lampiran yang sudah tersimpan (dari disk + DB). */
+    public function deleteFile(string $fileId): void
+    {
+        $file = PemeriksaanBerkasFile::where('permohonan_id', $this->selectedPermohonan)
+            ->whereKey($fileId)
+            ->first();
+
+        if (! $file) {
+            return;
+        }
+
+        Storage::disk('local')->delete($file->file_path);
+        $file->delete();
+
+        session()->flash('message', 'File dihapus.');
     }
 
     /**
@@ -287,6 +464,14 @@ class ManagePemeriksaanBerkas extends Component
             ? PemeriksaanBerkas::where('permohonan_id', $this->selectedPermohonan)->get()->keyBy('berkas_item_id')
             : collect();
 
+        // File lampiran yang sudah tersimpan, dikelompokkan per berkas.
+        $filesMap = $this->selectedPermohonan
+            ? PemeriksaanBerkasFile::where('permohonan_id', $this->selectedPermohonan)
+                ->orderBy('created_at')
+                ->get()
+                ->groupBy('berkas_item_id')
+            : collect();
+
         $catatanOptions = $this->editingBerkasId
             ? MstCatatan::where('is_active', true)
                 ->where(fn ($q) => $q->whereNull('berkas_item_id')->orWhere('berkas_item_id', $this->editingBerkasId))
@@ -327,7 +512,10 @@ class ManagePemeriksaanBerkas extends Component
             'permohonan' => $permohonan,
             'berkasList' => $berkasList,
             'hasBerkas' => $allBerkas->isNotEmpty(),
+            // Opsi dropdown pemetaan di modal unggah — daftar penuh (tak terpengaruh pencarian).
+            'uploadBerkasOptions' => $this->showUpload ? $allBerkas->values() : collect(),
             'pemeriksaan' => $pemeriksaan,
+            'filesMap' => $filesMap,
             'catatanOptions' => $catatanOptions,
             'statuses' => PemeriksaanStatusEnum::cases(),
             'printParents' => $printParents,

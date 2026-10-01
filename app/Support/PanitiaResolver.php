@@ -58,11 +58,21 @@ class PanitiaResolver
             return $panitia;
         }
 
-        $kepalaDesa = $desa->kepalaDesaAktif->map(function ($kd) {
+        $kepalaDesa = $desa->kepalaDesaAktif->map(function ($kd) use ($desa) {
+            // Dokumen resmi menulis "Kepala Desa <nama desa>" / "Lurah <nama kelurahan>"
+            // (lihat docs/RISALAH.pdf dan docs/BERITA ACARA PEMERIKSAAN LAPANG OLEH.pdf).
+            // Jabatan bawaan dilengkapi nama wilayah; jabatan yang diisi khusus
+            // (mis. "Pj. Kepala Desa Poduwoma") dibiarkan apa adanya.
+            $sebutanKepala = $desa->sebutanKepala();
+            $jabatan = trim($kd->jabatan ?: $sebutanKepala);
+            if (strcasecmp($jabatan, 'Kepala Desa') === 0 || strcasecmp($jabatan, 'Lurah') === 0) {
+                $jabatan = $sebutanKepala.' '.$desa->nama;
+            }
+
             $p = new PanitiaPemeriksa([
                 'nama' => $kd->nama,
                 'nip' => $kd->nip,
-                'jabatan' => $kd->jabatan ?: 'Kepala Desa',
+                'jabatan' => $jabatan,
                 'peran' => PeranPanitiaEnum::KEPALA_DESA->value,
                 'urutan' => 900 + (int) $kd->urutan,
                 'is_active' => true,

@@ -105,12 +105,17 @@
                 @forelse ($desaList as $d)
                     <li class="px-4 py-2 text-sm flex justify-between items-start gap-2 text-gray-700">
                         <span class="min-w-0">
-                            <span class="block truncate">{{ $d->nama }}</span>
+                            <span class="block truncate">
+                                {{ $d->nama }}
+                                @if ($d->sebutan() !== 'Desa')
+                                    <span class="ml-1 inline-flex px-1.5 py-0.5 rounded text-[9px] font-semibold align-middle bg-[#f9f0ff] text-[#722ed1] border border-[#d3adf7]">{{ $d->sebutan() }}</span>
+                                @endif
+                            </span>
                             <span class="text-[10px] font-mono text-gray-400">{{ $d->id }}</span>
                         </span>
                         <button wire:click="manageKades('{{ $d->id }}')"
                             class="shrink-0 inline-flex items-center gap-1 text-[11px] rounded px-2 py-1 border border-gray-200 text-gray-600 hover:border-[#1677ff] hover:text-[#1677ff]">
-                            👤 Kades
+                            👤 {{ $d->sebutanKepala() === 'Lurah' ? 'Lurah' : 'Kades' }}
                             @if ($d->kepala_desa_aktif_count)
                                 <span class="inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-[#1677ff] text-white text-[9px] font-medium">{{ $d->kepala_desa_aktif_count }}</span>
                             @endif
@@ -126,6 +131,11 @@
                     @error('desaId') <span class="text-[10px] text-red-500">{{ $message }}</span> @enderror
                     <input type="text" wire:model="desaNama" placeholder="Nama desa/kelurahan" class="border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1677ff]">
                     @error('desaNama') <span class="text-[10px] text-red-500">{{ $message }}</span> @enderror
+                    <select wire:model="desaJenis" class="border border-gray-300 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#1677ff]">
+                        <option value="DESA">Desa (dipimpin Kepala Desa)</option>
+                        <option value="KELURAHAN">Kelurahan (dipimpin Lurah)</option>
+                    </select>
+                    @error('desaJenis') <span class="text-[10px] text-red-500">{{ $message }}</span> @enderror
                     <input type="text" wire:model="desaKepala" placeholder="Nama kepala desa (opsional)" class="border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1677ff]">
                     <button type="submit" class="bg-[#1677ff] hover:bg-[#0958d9] text-white rounded px-2 py-1.5 text-xs font-medium">+ Tambah</button>
                 </form>
@@ -140,8 +150,8 @@
             <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
                 <div class="px-5 py-4 border-b border-gray-200 flex items-start justify-between">
                     <div>
-                        <h3 class="font-semibold text-gray-800">Kepala Desa — {{ $kadesDesa->nama }}</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">Kepala desa <span class="font-medium text-[#1677ff]">aktif</span> otomatis ikut sebagai penandatangan Berita Acara &amp; Risalah.</p>
+                        <h3 class="font-semibold text-gray-800">{{ $kadesDesa->sebutanKepala() }} — {{ $kadesDesa->namaLengkap() }}</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">{{ $kadesDesa->sebutanKepala() }} yang <span class="font-medium text-[#1677ff]">aktif</span> otomatis ikut sebagai penandatangan Berita Acara &amp; Risalah.</p>
                     </div>
                     <button wire:click="closeKades" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
                 </div>

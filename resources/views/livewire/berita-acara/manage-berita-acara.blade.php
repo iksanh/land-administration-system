@@ -70,9 +70,11 @@
                         class="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]">
                 </div>
             </div>
-            @include('livewire.riwayat-tanah._editor', [
+            {{-- Riwayat penguasaan: data bersama, diinput di modulnya sendiri.
+                 Di sini cukup ringkasan + editor modal yang menyimpan terpisah. --}}
+            @include('livewire.riwayat-tanah._ringkasan', [
+                'permohonanId' => $permohonan_id,
                 'label' => 'Riwayat Penguasaan (1.a)',
-                'hint' => 'Tiap poin akan dicetak sebagai butir terpisah pada bagian 1.a.',
             ])
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="flex flex-col gap-1.5">
@@ -146,7 +148,10 @@
                 <label class="text-sm font-medium text-gray-700">Lampiran Dokumentasi (foto)</label>
                 <input type="file" wire:model="newPhotos" multiple accept="image/*"
                     class="text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-[#e6f4ff] file:text-[#1677ff] file:text-sm file:font-medium">
-                <span class="text-xs text-gray-400">Format gambar, maks 5 MB per foto. Opsional — berita acara tetap bisa dicetak tanpa foto.</span>
+                <span class="text-xs text-gray-400">
+                    Format gambar, maks 5 MB per berkas. Tiap lampiran dicetak <span class="font-medium">satu halaman penuh</span> —
+                    unggah juga hasil pindai lembar tanda tangan yang sudah ditandatangani kepala desa/lurah di sini.
+                </span>
                 @error('newPhotos.*') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
 
                 <div wire:loading wire:target="newPhotos" class="text-xs text-[#1677ff]">Mengunggah foto...</div>
@@ -162,13 +167,19 @@
                 @endif
 
                 @if ($lampiranList->count())
-                    <p class="text-[11px] text-gray-400 uppercase tracking-wide mt-2">Foto tersimpan</p>
-                    <div class="flex flex-wrap gap-2">
+                    <p class="text-[11px] text-gray-400 uppercase tracking-wide mt-2">Lampiran tersimpan &mdash; urut sesuai halaman cetak</p>
+                    <div class="flex flex-col gap-2">
                         @foreach ($lampiranList as $lampiran)
-                            <div class="relative group">
-                                <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($lampiran->path) }}" class="w-20 h-20 object-cover rounded border border-gray-200">
-                                <button type="button" wire:click="removeLampiran('{{ $lampiran->id }}')" wire:confirm="Hapus foto ini?"
-                                    class="absolute -top-1.5 -right-1.5 bg-[#ff4d4f] text-white rounded-full w-5 h-5 text-xs leading-none flex items-center justify-center shadow">✕</button>
+                            <div class="flex items-center gap-3 border border-gray-200 rounded-md p-2 bg-white" wire:key="lampiran-{{ $lampiran->id }}">
+                                <span class="shrink-0 w-6 text-center text-xs font-semibold text-gray-400">{{ $loop->iteration }}</span>
+                                <a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($lampiran->path) }}" target="_blank" rel="noopener" class="shrink-0">
+                                    <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($lampiran->path) }}" class="w-16 h-16 object-cover rounded border border-gray-200">
+                                </a>
+                                <input type="text" wire:model.blur="lampiranKeterangan.{{ $lampiran->id }}"
+                                    placeholder="Keterangan lampiran (opsional) — dicetak di bawah gambar"
+                                    class="flex-1 min-w-0 border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]">
+                                <button type="button" wire:click="removeLampiran('{{ $lampiran->id }}')" wire:confirm="Hapus lampiran ini?"
+                                    class="shrink-0 bg-white border border-[#ffa39e] text-[#ff4d4f] hover:bg-[#fff1f0] rounded-md w-8 h-8 text-sm leading-none">✕</button>
                             </div>
                         @endforeach
                     </div>
@@ -269,4 +280,8 @@
                 style="position: absolute; width: 0; height: 0; border: 0; visibility: hidden;"></iframe>
         </div>
     @endif
+
+    {{-- Editor riwayat penguasaan (di luar <form> agar tombolnya tidak men-submit
+         berita acara; riwayat disimpan lewat aksinya sendiri). --}}
+    @include('livewire.riwayat-tanah._modal')
 </div>

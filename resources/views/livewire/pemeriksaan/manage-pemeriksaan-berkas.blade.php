@@ -90,10 +90,18 @@
             @endif
         </div>
         @if ($selectedPermohonan)
-            <button type="button" wire:click="openPrint"
-                class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-[#1677ff] bg-white border border-[#1677ff] hover:bg-[#e6f4ff] shrink-0">
-                🖨️ Cetak Lembar Pemeriksaan
-            </button>
+            <div class="flex flex-wrap gap-2 shrink-0">
+                @if ($hasBerkas)
+                    <button type="button" wire:click="openUpload"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-white bg-[#1677ff] hover:bg-[#0958d9] shadow-sm">
+                        ⬆️ Unggah Berkas
+                    </button>
+                @endif
+                <button type="button" wire:click="openPrint"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-[#1677ff] bg-white border border-[#1677ff] hover:bg-[#e6f4ff]">
+                    🖨️ Cetak Lembar Pemeriksaan
+                </button>
+            </div>
         @endif
     </div>
 
@@ -177,6 +185,26 @@
                                         class="mt-1 self-start text-xs font-medium text-[#1677ff] hover:text-[#0958d9]">
                                         {{ $row && $row->catatan ? '✎ Ubah catatan' : '＋ Tambah catatan' }}
                                     </button>
+                                @endif
+
+                                {{-- File lampiran hasil unggah untuk berkas ini. --}}
+                                @php $files = $filesMap->get($berkas->id) ?? collect(); @endphp
+                                @if ($files->isNotEmpty())
+                                    <ul class="mt-2 flex flex-col gap-1">
+                                        @foreach ($files as $f)
+                                            <li wire:key="file-{{ $f->id }}" class="flex items-center gap-2 text-sm">
+                                                <span class="text-gray-400">📎</span>
+                                                <a href="{{ route('pemeriksaan.file', $f->id) }}" target="_blank"
+                                                    class="text-[#1677ff] hover:underline truncate max-w-xs" title="{{ $f->nama_asli }}">{{ $f->nama_asli }}</a>
+                                                @if ($f->ukuran)
+                                                    <span class="text-[11px] text-gray-400">{{ number_format($f->ukuran / 1024, 0) }} KB</span>
+                                                @endif
+                                                <button type="button" wire:click="deleteFile('{{ $f->id }}')"
+                                                    wire:confirm="Hapus file '{{ $f->nama_asli }}'?"
+                                                    class="text-[11px] text-[#ff4d4f] hover:text-[#cf1322]">Hapus</button>
+                                            </li>
+                                        @endforeach
+                                    </ul>
                                 @endif
                             </div>
 
@@ -263,6 +291,109 @@
             {{-- Off-screen (not display:none — hidden iframes won't print in some browsers). --}}
             <iframe id="pemeriksaan-print-frame" aria-hidden="true" tabindex="-1"
                 style="position: absolute; width: 0; height: 0; border: 0; visibility: hidden;"></iframe>
+        </div>
+    @endif
+
+    {{-- Modal unggah berkas (massal): drag banyak file, auto-cocokkan ke berkas
+         via kode di nama file, konfirmasi pemetaan, lalu simpan. --}}
+    @if ($showUpload && $permohonan)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" wire:key="upload-modal">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col"
+                x-data="{ uploading: false, progress: 0, uploadError: '' }"
+                x-on:livewire-upload-start="uploading = true; progress = 0; uploadError = ''"
+                x-on:livewire-upload-finish="uploading = false; progress = 0"
+                x-on:livewire-upload-cancel="uploading = false"
+                x-on:livewire-upload-error="uploading = false; uploadError = 'Gagal mengunggah. Pastikan tiap file maksimal 10 MB dan bertipe PDF, JPG, atau PNG.'"
+                x-on:livewire-upload-progress="progress = $event.detail.progress">
+
+                <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+                    <div>
+                        <h3 class="font-semibold text-gray-800">Unggah Berkas</h3>
+                        <p class="text-xs text-gray-500">Seret beberapa file sekaligus — sistem menebak jenis berkas dari kode di nama file.</p>
+                    </div>
+                    <button type="button" wire:click="closeUpload" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                </div>
+
+                <div class="overflow-y-auto p-5 flex flex-col gap-4">
+                    {{-- Dropzone --}}
+                    <label class="relative flex flex-col items-center justify-center gap-1 border-2 border-dashed border-[#91caff] rounded-lg bg-[#e6f4ff]/40 hover:bg-[#e6f4ff]/70 transition-colors py-8 cursor-pointer text-center">
+                        <input type="file" multiple wire:model="uploads" accept=".pdf,.jpg,.jpeg,.png"
+                            class="absolute inset-0 opacity-0 cursor-pointer">
+                        <span class="text-3xl">⬆️</span>
+                        <span class="text-sm font-medium text-gray-700">Seret & letakkan file di sini, atau klik untuk memilih</span>
+                        <span class="text-xs text-gray-400">PDF, JPG, PNG · maks 10 MB / file</span>
+                    </label>
+
+                    {{-- Progress unggah ke server --}}
+                    <div x-show="uploading" x-cloak class="flex flex-col gap-1">
+                        <div class="flex justify-between text-xs text-gray-500">
+                            <span>Mengunggah…</span>
+                            <span x-text="progress + '%'"></span>
+                        </div>
+                        <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-[#1677ff] transition-[width] duration-150" x-bind:style="`width: ${progress}%`"></div>
+                        </div>
+                    </div>
+
+                    {{-- Error unggah dari sisi klien (mis. file terlalu besar / tipe salah). --}}
+                    <div x-show="uploadError" x-cloak class="flex items-start gap-2 bg-[#fff1f0] border border-[#ffa39e] text-[#cf1322] rounded-md px-3 py-2 text-sm">
+                        <span>⚠️</span><span x-text="uploadError"></span>
+                    </div>
+
+                    @error('uploads.*') <p class="text-xs text-red-500">{{ $message }}</p> @enderror
+                    @error('uploads') <p class="text-xs text-red-500">{{ $message }}</p> @enderror
+
+                    {{-- Tabel konfirmasi pemetaan --}}
+                    @if (count($uploads) > 0)
+                        <div class="border border-gray-200 rounded-lg divide-y divide-gray-100">
+                            <div class="px-4 py-2 bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase flex">
+                                <span class="flex-1">File</span>
+                                <span class="flex-1">Dipetakan ke berkas</span>
+                                <span class="w-16 text-right">Aksi</span>
+                            </div>
+                            @foreach ($uploads as $i => $file)
+                                @php $matched = ! empty($uploadMap[$i] ?? ''); @endphp
+                                <div class="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2" wire:key="upload-row-{{ $i }}">
+                                    <div class="flex-1 min-w-0 flex items-center gap-2">
+                                        <span>📄</span>
+                                        <span class="text-sm text-gray-700 truncate" title="{{ $file->getClientOriginalName() }}">{{ $file->getClientOriginalName() }}</span>
+                                        @if ($matched)
+                                            <span class="shrink-0 inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f6ffed] text-[#389e0d] border border-[#b7eb8f]">auto</span>
+                                        @else
+                                            <span class="shrink-0 inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#fff7e6] text-[#d46b08] border border-[#ffd591]">pilih manual</span>
+                                        @endif
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <select wire:model="uploadMap.{{ $i }}"
+                                            class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#1677ff]">
+                                            <option value="">— Pilih berkas —</option>
+                                            @foreach ($uploadBerkasOptions as $opt)
+                                                <option value="{{ $opt->id }}">{{ $opt->kode ? '['.$opt->kode.'] ' : '' }}{{ $opt->nama }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="w-16 text-right">
+                                        <button type="button" wire:click="removeUpload({{ $i }})" class="text-xs text-[#ff4d4f] hover:text-[#cf1322]">Buang</button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+
+                <div class="flex items-center justify-between gap-2 px-5 py-3 border-t border-gray-200">
+                    <p class="text-xs text-gray-400">File tak dipetakan akan dilewati. Unggah tidak mengubah status pemeriksaan.</p>
+                    <div class="flex gap-2 shrink-0">
+                        <button type="button" wire:click="closeUpload" class="bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-1.5 text-sm hover:bg-gray-50">Tutup</button>
+                        <button type="button" wire:click="saveUploads" wire:loading.attr="disabled" wire:target="saveUploads"
+                            @if (count($uploads) === 0) disabled @endif
+                            class="bg-[#1677ff] hover:bg-[#0958d9] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md px-4 py-1.5 text-sm font-medium">
+                            <span wire:loading.remove wire:target="saveUploads">Simpan {{ count($uploads) > 0 ? '('.count($uploads).')' : '' }}</span>
+                            <span wire:loading wire:target="saveUploads">Menyimpan…</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     @endif
 </div>

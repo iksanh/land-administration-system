@@ -18,6 +18,11 @@ use Livewire\WithFileUploads;
  * Berita Acara Pemeriksaan Lapang (BAPL). Data teknis tanah (luas, PBT, NIB,
  * batas, penggunaan) diambil otomatis dari permohonan terpilih; komponen ini
  * hanya mengelola field khusus berita acara + anggota panitia + lampiran foto.
+ *
+ * Riwayat penguasaan TIDAK dimiliki di sini — datanya dipakai bersama Risalah &
+ * SK dan diinput di modul Riwayat Tanah (/riwayat-tanah). Komponen ini hanya
+ * menampilkan ringkasannya dan menyediakan editor modal yang menyimpan lewat
+ * aksinya sendiri (trait WithRiwayatPenguasaan::simpanRiwayat).
  */
 #[Layout('components.layouts.app')]
 class ManageBeritaAcara extends Component
@@ -59,6 +64,14 @@ class ManageBeritaAcara extends Component
 
     /** @var array berkas foto baru yang diunggah */
     public array $newPhotos = [];
+
+    /**
+     * Keterangan tiap lampiran tersimpan, dikunci pada id-nya. Disimpan begitu
+     * kotaknya ditinggalkan — terpisah dari aksi simpan berita acara.
+     *
+     * @var array<string, string>
+     */
+    public array $lampiranKeterangan = [];
 
     // Modal pratinjau cetak (mengikuti pola Pemeriksaan Berkas): dokumen ditampilkan
     // di layar; tombol Cetak mencetak lewat iframe tersembunyi ke rute standalone.
@@ -112,6 +125,7 @@ class ManageBeritaAcara extends Component
         $this->sk_panitia_id = $ba->sk_panitia_id;
         $this->selectedPanitia = $ba->panitia->pluck('id')->all();
         $this->newPhotos = [];
+        $this->loadLampiranKeterangan($ba);
         $this->showForm = true;
     }
 
@@ -129,7 +143,17 @@ class ManageBeritaAcara extends Component
             'selectedPanitia.*' => ['exists:panitia_pemeriksa,id'],
             'newPhotos' => ['array'],
             'newPhotos.*' => ['image', 'max:5120'], // maks 5 MB / foto
-        ] + $this->riwayatRules();
+        ];
+    }
+
+    /** Ganti permohonan pada form baru: ringkasan riwayat ikut disegarkan. */
+    public function updatedPermohonanId(string $value): void
+    {
+        $this->riwayat_penguasaan = [];
+
+        if ($value !== '') {
+            $this->loadRiwayat($value);
+        }
     }
 
     /**
@@ -184,10 +208,6 @@ class ManageBeritaAcara extends Component
                 ],
             );
 
-            // Riwayat penguasaan disimpan sebagai record tersendiri (dipakai ulang
-            // oleh Risalah & SK) — lihat trait WithRiwayatPenguasaan.
-            $this->saveRiwayat($data['permohonan_id']);
-
             // Sinkron panitia + simpan urutan tampil.
             $sync = [];
             foreach (array_values($this->selectedPanitia) as $i => $panitiaId) {
@@ -207,7 +227,20 @@ class ManageBeritaAcara extends Component
 
         $this->newPhotos = [];
         $this->editingId = $ba->id;
+        $this->loadLampiranKeterangan($ba->fresh('lampiran'));
         session()->flash('message', 'Berita Acara berhasil disimpan.');
+    }
+
+    /** Simpan keterangan sebuah lampiran begitu kotaknya diubah. */
+    public function updatedLampiranKeterangan($value, $key): void
+    {
+        if (! $this->editingId || ! $key) {
+            return;
+        }
+
+        BeritaAcaraPemeriksaan::findOrFail($this->editingId)
+            ->lampiran()->whereKey($key)
+            ->update(['keterangan' => trim((string) $value) ?: null]);
     }
 
     public function removeLampiran(string $lampiranId): void
@@ -240,12 +273,20 @@ class ManageBeritaAcara extends Component
         session()->flash('message', 'Berita Acara berhasil dihapus.');
     }
 
+    private function loadLampiranKeterangan(BeritaAcaraPemeriksaan $ba): void
+    {
+        $this->lampiranKeterangan = $ba->lampiran
+            ->mapWithKeys(fn ($l) => [$l->id => $l->keterangan ?? ''])
+            ->all();
+    }
+
     public function resetForm(): void
     {
         $this->reset([
             'editingId', 'permohonan_id', 'nomor_ba', 'tgl_pemeriksaan',
             'keadaan_tanah', 'catatan_keberatan',
-            'perda_rtrw', 'sk_panitia_id', 'selectedPanitia', 'newPhotos', 'showForm',
+            'perda_rtrw', 'sk_panitia_id', 'selectedPanitia', 'newPhotos',
+            'lampiranKeterangan', 'showForm',
         ]);
         $this->resetRiwayat();
     }

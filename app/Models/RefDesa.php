@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\JenisDesaEnum;
 use Illuminate\Database\Eloquent\Model;
 
 class RefDesa extends Model
@@ -14,7 +15,32 @@ class RefDesa extends Model
 
     public $timestamps = false;
 
-    protected $fillable = ['id', 'kecamatan_id', 'nama', 'nama_kepala_desa'];
+    protected $fillable = ['id', 'kecamatan_id', 'nama', 'jenis', 'nama_kepala_desa'];
+
+    protected function casts(): array
+    {
+        return [
+            'jenis' => JenisDesaEnum::class,
+        ];
+    }
+
+    /** "Desa" atau "Kelurahan" — sebutan yang tercetak pada dokumen. */
+    public function sebutan(): string
+    {
+        return ($this->jenis ?? JenisDesaEnum::DESA)->sebutan();
+    }
+
+    /** "Kepala Desa" atau "Lurah". */
+    public function sebutanKepala(): string
+    {
+        return ($this->jenis ?? JenisDesaEnum::DESA)->sebutanKepala();
+    }
+
+    /** "Desa PODUWOMA" / "Kelurahan TUMBIHE". */
+    public function namaLengkap(): string
+    {
+        return $this->sebutan().' '.$this->nama;
+    }
 
     public function kecamatan()
     {

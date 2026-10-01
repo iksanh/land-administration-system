@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\BeritaAcaraPrintController;
 use App\Http\Controllers\BeritaAcaraWordController;
+use App\Http\Controllers\PemeriksaanFileController;
 use App\Http\Controllers\PemeriksaanPrintController;
 use App\Http\Controllers\RisalahPrintController;
 use App\Http\Controllers\RisalahWordController;
@@ -22,6 +23,7 @@ use App\Livewire\Pemohon\ManagePemohon;
 use App\Livewire\Permohonan\ManagePermohonan;
 use App\Livewire\Risalah\ManageRisalah;
 use App\Livewire\RiwayatTanah\CheckTypo;
+use App\Livewire\RiwayatTanah\ManageRiwayatTanah;
 use App\Livewire\Tanah\ManageTanah;
 use App\Livewire\Users\ManageUsers;
 use App\Livewire\Wilayah\ManageWilayah;
@@ -50,7 +52,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/tanah', ManageTanah::class)->name('tanah');
     Route::get('/permohonan', ManagePermohonan::class)->name('permohonan');
     Route::get('/pemeriksaan-berkas', ManagePemeriksaanBerkas::class)->name('pemeriksaan-berkas');
+    Route::get('/pemeriksaan-berkas/file/{file}', PemeriksaanFileController::class)->name('pemeriksaan.file');
     Route::get('/permohonan/{permohonan}/cetak-pemeriksaan', PemeriksaanPrintController::class)->name('pemeriksaan.print');
+    // Riwayat penguasaan tanah — input tersendiri, dipakai bersama oleh
+    // Berita Acara, Risalah, dan SK.
+    Route::get('/riwayat-tanah', ManageRiwayatTanah::class)->name('riwayat-tanah');
     Route::get('/audit-log', AuditLogTimeline::class)->name('audit-log');
     Route::get('/cek-typo', CheckTypo::class)->name('cek-typo');
 

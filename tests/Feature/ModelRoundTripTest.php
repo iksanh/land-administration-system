@@ -11,6 +11,7 @@ use App\Models\MstCatatan;
 use App\Models\MstLayanan;
 use App\Models\Pemohon;
 use App\Models\PemeriksaanBerkas;
+use App\Models\PemeriksaanBerkasFile;
 use App\Models\Permohonan;
 use App\Models\PermohonanAuditLog;
 use App\Models\RefDesa;
@@ -147,6 +148,29 @@ class ModelRoundTripTest extends TestCase
         $this->assertIsArray($fresh->catatan);
         $this->assertSame('KTP tidak terbaca', $fresh->catatan[0]['teks']);
         $this->assertTrue($fresh->catatan[1]['is_custom']);
+    }
+
+    public function test_pemeriksaan_berkas_file_uses_uuid_and_created_at_only(): void
+    {
+        $berkas = MstBerkasItem::create(['nama' => 'KTP', 'kode' => 'KTP']);
+        $permohonan = Permohonan::create(['nomor_registrasi' => 'REG-FILE-1']);
+
+        $file = PemeriksaanBerkasFile::create([
+            'permohonan_id' => $permohonan->id,
+            'berkas_item_id' => $berkas->id,
+            'file_path' => 'pemeriksaan/x/abc.pdf',
+            'nama_asli' => 'abc.pdf',
+            'ukuran' => 2048,
+            'mime' => 'application/pdf',
+        ]);
+
+        $fresh = $file->fresh();
+        $this->assertTrue(Str::isUuid($fresh->id));
+        $this->assertSame(2048, $fresh->ukuran);
+        $this->assertNotNull($fresh->created_at);
+        $this->assertNull($fresh->updated_at); // tabel tanpa updated_at
+        $this->assertSame('KTP', $fresh->berkasItem->kode);
+        $this->assertSame('REG-FILE-1', $fresh->permohonan->nomor_registrasi);
     }
 
     public function test_audit_log_uses_bigint_pk_and_status_enums(): void

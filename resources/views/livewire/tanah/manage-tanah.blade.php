@@ -97,10 +97,27 @@
                         </select>
                         @error('kesesuaian_penggunaan_tanah') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
                     </div>
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-sm font-medium text-gray-700">Kawasan menurut RTRW</label>
+                        <input type="text" wire:model="rtrw_kawasan" placeholder="mis. Kawasan Permukiman Perkotaan" class="{{ $f }}">
+                        <span class="text-xs text-gray-400">Dicetak pada Berita Acara: &ldquo;berada dalam &hellip;&rdquo;.</span>
+                        @error('rtrw_kawasan') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+                    </div>
                     <div class="flex flex-col gap-1.5 md:col-span-2">
                         <label class="text-sm font-medium text-gray-700">Penggunaan Tanah di SK</label>
                         <input type="text" wire:model="penggunaan_tanah_sk" placeholder="Penggunaan tanah sesuai SK" class="{{ $f }}">
                         @error('penggunaan_tanah_sk') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-sm font-medium text-gray-700">Penanda Tangan Peta Analisis</label>
+                        <input type="text" wire:model="pejabat_peta_analisis" placeholder="Nama Kepala Seksi Penataan dan Pemberdayaan" class="{{ $f }}">
+                        <span class="text-xs text-gray-400">Boleh berbeda dari anggota panitia yang sedang menjabat.</span>
+                        @error('pejabat_peta_analisis') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-sm font-medium text-gray-700">NIP Penanda Tangan Peta Analisis</label>
+                        <input type="text" wire:model="nip_peta_analisis" placeholder="Opsional" class="{{ $f }}">
+                        @error('nip_peta_analisis') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
                     </div>
                 </div>
             </section>

@@ -17,6 +17,13 @@
                 @error('nama') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
             </div>
             <div class="flex flex-col gap-1.5">
+                <label class="text-sm font-medium text-gray-700">Kode Berkas (opsional)</label>
+                <input type="text" wire:model="kode" placeholder="Misal: KTP, SPPF" maxlength="20"
+                    class="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white uppercase focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]">
+                <span class="text-xs text-gray-400">Dipakai untuk mencocokkan nama file saat unggah massal di Pemeriksaan Berkas.</span>
+                @error('kode') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+            </div>
+            <div class="flex flex-col gap-1.5">
                 <label class="text-sm font-medium text-gray-700">Induk Berkas (opsional)</label>
                 <select wire:model="parent_id"
                     class="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1677ff]/20 focus:border-[#1677ff]">
@@ -62,6 +69,9 @@
                             <div class="flex items-center gap-2">
                                 <span>{{ $item->subBerkas->count() > 0 ? '📁' : '📄' }}</span>
                                 <span class="font-medium text-gray-800">{{ $item->nama }}</span>
+                                @if ($item->kode)
+                                    <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#e6f4ff] text-[#0958d9] border border-[#91caff]">{{ $item->kode }}</span>
+                                @endif
                                 @if ($item->is_mandatory)
                                     <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-600 border border-red-200">Wajib</span>
                                 @endif
@@ -85,6 +95,9 @@
                                         <div class="flex items-center gap-2">
                                             <span>📄</span>
                                             <span class="text-sm text-gray-700">{{ $child->nama }}</span>
+                                            @if ($child->kode)
+                                                <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#e6f4ff] text-[#0958d9] border border-[#91caff]">{{ $child->kode }}</span>
+                                            @endif
                                             @if ($child->is_mandatory)
                                                 <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-600 border border-red-200">Wajib</span>
                                             @endif

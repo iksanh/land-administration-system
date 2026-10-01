@@ -83,7 +83,7 @@ class ManageRisalahTest extends TestCase
         $this->assertSame('Setuju dikabulkan.', $r->panitia->firstWhere('id', $ketua->id)->pivot->pendapat);
     }
 
-    public function test_riwayat_penguasaan_is_read_only_reference_from_berita_acara(): void
+    public function test_riwayat_penguasaan_is_shared_data_saved_by_its_own_action(): void
     {
         $p = $this->permohonan();
         RiwayatPenguasaan::create([
@@ -93,22 +93,39 @@ class ManageRisalahTest extends TestCase
 
         Livewire::test(ManageRisalah::class)
             ->call('createFor', $p->id)
-            // Riwayat dimuat read-only dari record Berita Acara.
+            // Riwayat dimuat dari record bersama milik permohonan.
             ->assertSet('riwayat_penguasaan', ['Dikuasai Rasid Nusi sejak 1996.', 'Dijual ke Abdul Wahab 2003.'])
-            // Modal detail dapat dibuka & ditutup.
+            // Editor modal dapat dibuka & ditutup.
             ->assertSet('showRiwayatModal', false)
-            ->call('showRiwayatDetail')
+            ->call('openRiwayat', $p->id)
             ->assertSet('showRiwayatModal', true)
-            ->call('closeRiwayatModal')
+            ->call('closeRiwayat')
             ->assertSet('showRiwayatModal', false)
+            // Mengubah teks lalu menyimpan RISALAH tidak menyentuh riwayat.
+            ->set('riwayat_penguasaan', ['Diubah tanpa disimpan.'])
             ->call('save')
             ->assertHasNoErrors();
 
-        // Menyimpan Risalah TIDAK mengubah riwayat penguasaan (sumber = Berita Acara).
         $this->assertSame(
             ['Dikuasai Rasid Nusi sejak 1996.', 'Dijual ke Abdul Wahab 2003.'],
             $p->refresh()->riwayatPenguasaan->poin,
         );
+    }
+
+    public function test_riwayat_can_be_edited_from_risalah_through_its_own_modal(): void
+    {
+        $p = $this->permohonan();
+        RiwayatPenguasaan::create(['permohonan_id' => $p->id, 'poin' => ['Poin lama.']]);
+
+        Livewire::test(ManageRisalah::class)
+            ->call('createFor', $p->id)
+            ->call('openRiwayat', $p->id)
+            ->set('riwayat_penguasaan', ['Poin baru.', '  '])
+            ->call('simpanRiwayat')
+            ->assertHasNoErrors()
+            ->assertSet('showRiwayatModal', false);
+
+        $this->assertSame(['Poin baru.'], $p->refresh()->riwayatPenguasaan->poin);
     }
 
     public function test_one_risalah_per_permohonan(): void
@@ -222,5 +239,72 @@ class ManageRisalahTest extends TestCase
             ->assertSee('Dikuasai sejak 1996.');
 
         $this->assertStringContainsString('.doc', $res->headers->get('content-disposition'));
+    }
+
+    /**
+     * Format cetak mengikuti dokumen resmi docs/RISALAH.pdf: kepala desa disebut
+     * "ditunjuk sebagai", bagian IX memakai frasa ber-"Panitia" dengan urutan
+     * ketua → anggota → kepala desa → sekretaris, dan ditutup paragraf baku.
+     */
+    public function test_print_follows_official_risalah_wording(): void
+    {
+        $user = User::create([
+            'name' => 'Petugas', 'email' => 'ris-format@app.com',
+            'hashed_password' => Hash::make('x'), 'roles' => ['petugas'], 'is_active' => true,
+        ]);
+
+        RefProvinsi::create(['id' => '75', 'nama' => 'GORONTALO']);
+        RefKabupaten::create(['id' => '7503', 'provinsi_id' => '75', 'nama' => 'BONE BOLANGO']);
+        RefKecamatan::create(['id' => '750301', 'kabupaten_id' => '7503', 'nama' => 'SUWAWA TIMUR']);
+        $desa = RefDesa::create(['id' => '7503012001', 'kecamatan_id' => '750301', 'nama' => 'PODUWOMA']);
+        RefKepalaDesa::create(['desa_id' => $desa->id, 'nama' => 'Agus Salim Ishak', 'is_active' => true]);
+
+        $sk = SkPanitia::create([
+            'nomor' => '134/SK-75.03/V/2025',
+            'tanggal' => '2025-05-27',
+            'tentang' => 'Revisi Ke-I Susunan Tim Panitia Pemeriksaan Tanah "A" Tahun 2025',
+            'is_active' => true,
+        ]);
+        $ketua = $sk->anggota()->create(['nama' => 'Silva R. Uno', 'peran' => 'KETUA', 'urutan' => 1]);
+        $sekretaris = $sk->anggota()->create(['nama' => 'Vivi Oktaviani', 'peran' => 'SEKRETARIS', 'urutan' => 4]);
+
+        $pemohon = Pemohon::create(['nik' => '7503010101010011', 'nama' => 'Suhariyaman Pateda']);
+        $tanah = Tanah::create(['pemohon_id' => $pemohon->id, 'luas' => 2726, 'desa_id' => $desa->id]);
+        $p = Permohonan::create([
+            'nomor_registrasi' => 'REG-FMT-1', 'pemohon_id' => $pemohon->id, 'tanah_id' => $tanah->id,
+        ]);
+        $r = RisalahPanitiaA::create([
+            'permohonan_id' => $p->id,
+            'tgl_risalah' => '2026-01-05',
+            'nomor_sk_panitia' => $sk->nomor,
+            'tgl_sk_panitia' => $sk->tanggal,
+            'sk_panitia_id' => $sk->id,
+        ]);
+        $r->panitia()->sync([
+            $ketua->id => ['urutan' => 0],
+            $sekretaris->id => ['urutan' => 1],
+        ]);
+
+        $html = $this->actingAs($user)->get(route('risalah.print', $r->id))->assertOk()->getContent();
+
+        // Kepala desa: jabatan menyebut nama desa, tanpa koma sebelum "ditunjuk".
+        $this->assertStringContainsString('Kepala Desa PODUWOMA ditunjuk sebagai Anggota', $html);
+        // Bagian IX memakai frasa ber-"Panitia".
+        $this->assertStringContainsString('sebagai Ketua Panitia Merangkap Anggota', $html);
+        $this->assertStringContainsString('ditunjuk sebagai Sekretaris Merangkap Anggota', $html);
+        // Paragraf penutup baku setelah pendapat anggota.
+        $this->assertStringContainsString('batal demi hukum', $html);
+        // Judul bagian I ikut menyebut nama pemohon.
+        $this->assertMatchesRegularExpression('/URAIAN MENGENAI PEMOHON.{0,40}Suhariyaman Pateda/s', $html);
+        // Klausa "tentang" pada butir SK diambil dari SK di Config Panitia.
+        $this->assertStringContainsString('Revisi Ke-I Susunan Tim Panitia', $html);
+
+        // Urutan bagian IX: kepala desa sebelum sekretaris (berbeda dari urutan
+        // tanda tangan yang mengikuti kolom `urutan`).
+        $ix = substr($html, strpos($html, 'PENDAPAT ANGGOTA PANITIA'));
+        $this->assertLessThan(
+            strpos($ix, 'Vivi Oktaviani'),
+            strpos($ix, 'Agus Salim Ishak'),
+        );
     }
 }

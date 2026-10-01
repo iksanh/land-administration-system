@@ -39,12 +39,26 @@
 
     $jenisHak = $r->jenis_hak ?: 'Hak Milik';
     $namaPemohon = $pemohon?->nama ?? '…………………';
-    $letakSingkat = 'Desa '.($desa?->nama ?? '…').', Kecamatan '.($kec?->nama ?? '…').', Kabupaten '.($kab?->nama ?? '…').', Provinsi '.($prov?->nama ?? '…');
+    $letakSingkat = ($desa?->namaLengkap() ?? 'Desa …').', Kecamatan '.($kec?->nama ?? '…').', Kabupaten '.($kab?->nama ?? '…').', Provinsi '.($prov?->nama ?? '…');
     $penggunaan = $t?->penggunaan_tanah ?: '…';
-    $kawasanRtrw = $r->rtrw_kawasan ?: ($t?->rencana_penggunaan_rtrw ?: '…');
+    $kawasanRtrw = $r->rtrw_kawasan ?: ($t?->rtrw_kawasan ?: ($t?->rencana_penggunaan_rtrw ?: '…'));
     $perdaRtrw = $r->perda_rtrw ?: RisalahDefaults::PERDA_RTRW;
 
     $jumlahPanitia = $r->panitia->count();
+
+    // Klausa "tentang ..." pada butir SK panitia di bagian V. Bila risalah terikat
+    // ke sebuah SK di Config Panitia, pakai bunyi "tentang" milik SK itu (bisa
+    // memuat klausa revisi seperti pada dokumen resmi); jika tidak, pakai bunyi
+    // baku ditambah tahun SK.
+    $skTentang = $r->skPanitia?->tentang
+        ?: 'Susunan Tim Panitia Pemeriksaan Tanah "A" (Panitia "A") Kantor Pertanahan Kabupaten Bone Bolango'
+            .($r->tgl_sk_panitia ? ' Tahun '.$r->tgl_sk_panitia->format('Y') : '');
+
+    // Bagian IX memakai urutan sendiri (ketua, anggota, kepala desa, sekretaris)
+    // yang berbeda dari urutan tanda tangan — lihat PeranPanitiaEnum::prioritasPendapat().
+    $panitiaPendapat = $r->panitia
+        ->sortBy(fn ($a) => [$a->peran->prioritasPendapat(), $a->urutan, $a->nama])
+        ->values();
 
     $tgl = fn ($d) => $d ? $d->locale('id')->translatedFormat('d F Y') : '…………………';
 
@@ -95,7 +109,9 @@
             <tr>
                 <td style="{{ $numItem }}">{{ $i + 1 }}.</td>
                 <td style="width:42%;vertical-align:top;"><strong>{{ $anggota->nama }}</strong></td>
-                <td style="{{ $cell }}">{{ $anggota->jabatan }}{{ $anggota->jabatan ? ', ' : '' }}{{ $anggota->peran->frasa() }}{{ $loop->last ? '' : ';' }}</td>
+                @php $frasa = $anggota->peran->frasaRisalah(); @endphp
+                {{-- Dokumen resmi tidak memberi koma sebelum "ditunjuk sebagai". --}}
+                <td style="{{ $cell }}">{{ $anggota->jabatan }}{{ $anggota->jabatan ? (Str::startsWith($frasa, 'ditunjuk') ? ' ' : ', ') : '' }}{{ $frasa }}{{ $loop->last ? '' : ';' }}</td>
             </tr>
         @endforeach
     </table>
@@ -116,7 +132,7 @@
         <tr>
             <td style="{{ $romNum }}">I.</td>
             <td style="{{ $cell }}">
-                <span style="{{ $heading }}">URAIAN MENGENAI PEMOHON</span>
+                <span style="{{ $heading }}">URAIAN MENGENAI PEMOHON</span> : <strong>{{ $namaPemohon }}</strong>
                 <table style="width:100%;border-collapse:collapse;margin-top:2px;">
                     <tr>
                         <td style="{{ $roman2 }}">1.</td>
@@ -223,8 +239,8 @@
                             <tr>
                                 <td style="{{ $numItem }}">{{ count($dasarHukum) + 1 }}.</td>
                                 <td style="{{ $cell }}">
-                                    Keputusan Kepala Kantor Pertanahan Kabupaten Bone Bolango Nomor {{ $r->nomor_sk_panitia }}@if ($r->tgl_sk_panitia) Tanggal {{ $tgl($r->tgl_sk_panitia) }}@endif
-                                    tentang Susunan Tim Panitia Pemeriksaan Tanah "A" (Panitia "A") Kantor Pertanahan Kabupaten Bone Bolango.
+                                    Keputusan Kepala Kantor Pertanahan Kabupaten Bone Bolango Nomor: {{ $r->nomor_sk_panitia }}@if ($r->tgl_sk_panitia) Tanggal {{ $tgl($r->tgl_sk_panitia) }}@endif
+                                    tentang {{ $skTentang }}.
                                 </td>
                             </tr>
                         @endif
@@ -490,16 +506,17 @@
             <td style="{{ $cell }}">
                 <span style="{{ $heading }}">PENDAPAT ANGGOTA PANITIA</span>
                 <table style="width:100%;border-collapse:collapse;margin-top:4px;">
-                    @foreach ($r->panitia as $i => $anggota)
+                    @foreach ($panitiaPendapat as $i => $anggota)
                         <tr>
                             <td style="{{ $numItem }}">{{ $i + 1 }}.</td>
                             <td style="{{ $cell }}">
-                                <strong>{{ $anggota->nama }}</strong>, {{ Str::after($anggota->peran->frasa(), 'sebagai ') ? 'sebagai '.Str::after($anggota->peran->frasa(), 'sebagai ') : $anggota->peran->label() }}:
+                                <strong>{{ $anggota->nama }}</strong>, {{ $anggota->peran->frasaPendapatRisalah() }}:
                                 <div style="white-space:pre-line;">{{ $anggota->pivot->pendapat ?: '…………………………………………………………………………' }}</div>
                             </td>
                         </tr>
                     @endforeach
                 </table>
+                <p style="margin:8px 0 0;text-indent:36px;">{{ RisalahDefaults::penutupPendapat($jenisHak) }}</p>
             </td>
         </tr>
     </table>

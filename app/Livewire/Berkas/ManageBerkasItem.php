@@ -15,16 +15,24 @@ use Livewire\Component;
 class ManageBerkasItem extends Component
 {
     public string $search = '';
+
     public ?string $editingId = null;
+
     public string $nama = '';
+
+    public string $kode = '';
+
     public bool $is_mandatory = true;
+
     public string $catatan = '';
+
     public ?string $parent_id = null;
 
     protected function rules(): array
     {
         return [
             'nama' => ['required', 'string', 'max:255'],
+            'kode' => ['nullable', 'string', 'max:20'],
             'is_mandatory' => ['boolean'],
             'catatan' => ['nullable', 'string'],
             'parent_id' => ['nullable', 'uuid', 'exists:mst_berkas_item,id'],
@@ -41,6 +49,9 @@ class ManageBerkasItem extends Component
             return;
         }
 
+        // Kode disimpan huruf besar tanpa spasi tepi agar cocok saat mencocokkan nama file.
+        $kode = strtoupper(trim($data['kode'] ?? ''));
+        $data['kode'] = $kode !== '' ? $kode : null;
         $data['catatan'] = $data['catatan'] !== '' ? $data['catatan'] : null;
         $data['parent_id'] = $data['parent_id'] ?: null;
 
@@ -60,6 +71,7 @@ class ManageBerkasItem extends Component
         $berkas = MstBerkasItem::findOrFail($id);
         $this->editingId = $berkas->id;
         $this->nama = $berkas->nama;
+        $this->kode = $berkas->kode ?? '';
         $this->is_mandatory = $berkas->is_mandatory;
         $this->catatan = $berkas->catatan ?? '';
         $this->parent_id = $berkas->parent_id;
@@ -73,7 +85,7 @@ class ManageBerkasItem extends Component
 
     public function resetForm(): void
     {
-        $this->reset(['editingId', 'nama', 'catatan', 'parent_id']);
+        $this->reset(['editingId', 'nama', 'kode', 'catatan', 'parent_id']);
         $this->is_mandatory = true;
     }
 
