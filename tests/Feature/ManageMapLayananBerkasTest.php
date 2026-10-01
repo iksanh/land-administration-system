@@ -59,16 +59,49 @@ class ManageMapLayananBerkasTest extends TestCase
         $this->assertSame(0, MapLayananBerkas::where('layanan_id', $layanan->id)->count());
     }
 
-    public function test_update_urutan_changes_value(): void
+    private function urutanOf(MstLayanan $layanan): array
     {
-        [$layanan, $ktp] = $this->makeData();
+        return MapLayananBerkas::where('layanan_id', $layanan->id)
+            ->orderBy('urutan')->pluck('urutan', 'berkas_item_id')->all();
+    }
+
+    public function test_sort_moves_item_to_dropped_position_and_renumbers(): void
+    {
+        [$layanan, $ktp, $kk] = $this->makeData();
+        $sppt = MstBerkasItem::create(['nama' => 'SPPT']);
 
         $c = Livewire::test(ManageMapLayananBerkas::class)->set('selectedLayanan', $layanan->id);
-        $c->call('toggle', $ktp->id);
-        $c->call('updateUrutan', $ktp->id, 5);
+        $c->call('toggle', $ktp->id)->call('toggle', $kk->id)->call('toggle', $sppt->id);
 
-        $this->assertDatabaseHas('map_layanan_berkas', [
-            'layanan_id' => $layanan->id, 'berkas_item_id' => $ktp->id, 'urutan' => 5,
-        ]);
+        // Drag SPPT (last) to the top (0-based position 0).
+        $c->call('sortBerkas', $sppt->id, 0);
+
+        $this->assertSame([$sppt->id => 1, $ktp->id => 2, $kk->id => 3], $this->urutanOf($layanan));
+    }
+
+    public function test_move_berkas_swaps_with_neighbour_and_clamps_at_edges(): void
+    {
+        [$layanan, $ktp, $kk] = $this->makeData();
+
+        $c = Livewire::test(ManageMapLayananBerkas::class)->set('selectedLayanan', $layanan->id);
+        $c->call('toggle', $ktp->id)->call('toggle', $kk->id);
+
+        $c->call('moveBerkas', $kk->id, -1);
+        $this->assertSame([$kk->id => 1, $ktp->id => 2], $this->urutanOf($layanan));
+
+        $c->call('moveBerkas', $kk->id, -1); // already first → no change
+        $this->assertSame([$kk->id => 1, $ktp->id => 2], $this->urutanOf($layanan));
+    }
+
+    public function test_removing_a_mapping_closes_the_urutan_gap(): void
+    {
+        [$layanan, $ktp, $kk] = $this->makeData();
+        $sppt = MstBerkasItem::create(['nama' => 'SPPT']);
+
+        $c = Livewire::test(ManageMapLayananBerkas::class)->set('selectedLayanan', $layanan->id);
+        $c->call('toggle', $ktp->id)->call('toggle', $kk->id)->call('toggle', $sppt->id);
+        $c->call('toggle', $kk->id);
+
+        $this->assertSame([$ktp->id => 1, $sppt->id => 2], $this->urutanOf($layanan));
     }
 }
