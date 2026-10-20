@@ -6,6 +6,7 @@ use App\Http\Controllers\PemeriksaanFileController;
 use App\Http\Controllers\PemeriksaanPrintController;
 use App\Http\Controllers\RisalahPrintController;
 use App\Http\Controllers\RisalahWordController;
+use App\Livewire\ApiKunci\ManageApiKunci;
 use App\Livewire\AuditLog\AuditLogTimeline;
 use App\Livewire\Auth\ForgotPassword;
 use App\Livewire\Auth\Login;
@@ -77,6 +78,7 @@ Route::middleware('auth')->group(function () {
     // Admin-only (ports get_current_admin)
     Route::middleware('role:admin')->group(function () {
         Route::get('/users', ManageUsers::class)->name('users');
+        Route::get('/kunci-api', ManageApiKunci::class)->name('kunci-api');
     });
 
     Route::post('/logout', function () {
